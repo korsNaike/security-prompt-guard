@@ -1,0 +1,8 @@
+docs
+.env
+.venv
+.ai-factory.json
+.codex
+.agents
+.idea
+.mcp.json

@@ -227,6 +227,22 @@ class BillingRepository:
             description=f"Promo code {promo_code.code}",
         )
 
+    async def create_promo_code(
+        self,
+        *,
+        code: str,
+        credits_amount: int,
+        max_activations: int | None,
+    ) -> PromoCodeModel:
+        promo_code = PromoCodeModel(
+            code=code.strip().upper(),
+            credits_amount=credits_amount,
+            max_activations=max_activations,
+        )
+        self.session.add(promo_code)
+        await self.session.flush()
+        return promo_code
+
     async def _add_positive_balance_transaction(
         self,
         *,

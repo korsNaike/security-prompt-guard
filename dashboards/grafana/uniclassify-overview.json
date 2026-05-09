@@ -1,0 +1,35 @@
+{
+  "title": "UniClassify Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["uniclassify", "ml"],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "HTTP Requests",
+      "targets": [
+        {
+          "expr": "sum(rate(uniclassify_http_requests_total[5m])) by (status)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Latency Average",
+      "targets": [
+        {
+          "expr": "sum(rate(uniclassify_http_request_duration_seconds_sum[5m])) / sum(rate(uniclassify_http_request_duration_seconds_count[5m]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker Outcomes",
+      "targets": [
+        {
+          "expr": "sum(rate(uniclassify_worker_outcomes_total[5m])) by (model_code, status, cache_hit)"
+        }
+      ]
+    }
+  ]
+}

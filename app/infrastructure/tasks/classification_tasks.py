@@ -10,6 +10,7 @@ from app.infrastructure.db.repositories.billing_repository import BillingReposit
 from app.infrastructure.db.repositories.classification_repository import ClassificationRepository
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.ml.loader import model_registry
+from app.infrastructure.monitoring.metrics import metrics_registry
 from app.infrastructure.tasks.celery_app import celery_app
 
 
@@ -114,6 +115,11 @@ async def process_classification_request(
                         model_version=model_version,
                     ),
                 )
+            metrics_registry.record_worker(
+                model_code=model_code,
+                status="completed",
+                cache_hit=cache_hit,
+            )
             return {
                 "request_id": request_id,
                 "status": "completed",
@@ -150,6 +156,11 @@ async def process_classification_request(
                 if request.batch_id is not None:
                     await repository.update_batch_progress(request.batch_id)
                 await session.commit()
+                metrics_registry.record_worker(
+                    model_code=request.model_code,
+                    status="failed",
+                    cache_hit=False,
+                )
         return {"request_id": request_id, "status": "failed", "error": str(exc)}
 
 

@@ -27,6 +27,15 @@ class UserRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_users(self, limit: int = 100) -> list[UserModel]:
+        result = await self.session.execute(
+            select(UserModel)
+            .options(selectinload(UserModel.balance))
+            .order_by(UserModel.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def create_user_with_balance(
         self,
         *,

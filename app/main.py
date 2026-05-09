@@ -5,7 +5,9 @@ from fastapi.responses import PlainTextResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.monitoring.metrics import metrics_registry
+from app.infrastructure.monitoring.persisted_metrics import render_persisted_prometheus_metrics
 
 
 def create_app() -> FastAPI:
@@ -38,7 +40,13 @@ def create_app() -> FastAPI:
 
     @app.get("/metrics", tags=["monitoring"], summary="Prometheus metrics")
     async def metrics() -> PlainTextResponse:
-        return PlainTextResponse(metrics_registry.render_prometheus())
+        rendered = metrics_registry.render_prometheus()
+        try:
+            async with AsyncSessionLocal() as session:
+                rendered += await render_persisted_prometheus_metrics(session)
+        except Exception:
+            rendered += "# persisted metrics unavailable\n"
+        return PlainTextResponse(rendered)
 
     return app
 

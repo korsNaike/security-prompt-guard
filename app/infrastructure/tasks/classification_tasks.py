@@ -12,6 +12,7 @@ from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.ml.loader import model_registry
 from app.infrastructure.monitoring.metrics import metrics_registry
 from app.infrastructure.tasks.celery_app import celery_app
+from app.infrastructure.tasks.task_session import run_with_isolated_task_session
 
 
 async def process_classification_request(
@@ -182,7 +183,13 @@ def run_classification_task(
     if model_code is None or mode is None or text is None:
         import anyio
 
-        return anyio.run(process_classification_request, request_id)
+        async def run_with_task_session(session_factory):
+            return await process_classification_request(
+                request_id,
+                session_factory=session_factory,
+            )
+
+        return anyio.run(run_with_isolated_task_session, run_with_task_session)
 
     classifier = model_registry.get(model_code)
     output = classifier.predict(ClassificationInput(text=text, model_code=model_code, mode=mode))

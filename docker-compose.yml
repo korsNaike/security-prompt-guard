@@ -22,7 +22,10 @@ services:
 
   worker:
     build: .
-    command: uv run python -m celery -A app.infrastructure.tasks.celery_app.celery_app worker --loglevel=INFO
+    command: >-
+      uv run python -m celery
+      -A app.infrastructure.tasks.celery_app.celery_app
+      worker --loglevel=INFO --pool=solo
     env_file: .env.example
     depends_on:
       api:

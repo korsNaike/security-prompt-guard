@@ -17,6 +17,7 @@ def test_runtime_commands_use_python_modules() -> None:
     assert "python -m fastapi" in compose["services"]["api"]["command"]
     assert "python -m celery" in compose["services"]["worker"]["command"]
     assert "python -m celery" in compose["services"]["beat"]["command"]
+    assert "--pool=solo" in compose["services"]["worker"]["command"]
 
 
 def test_services_have_healthchecks_and_healthy_dependencies() -> None:

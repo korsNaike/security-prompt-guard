@@ -28,18 +28,23 @@ def _to_schema(descriptor) -> ModelInfo:
     )
 
 
+async def _get_catalog_models(session) -> list:
+    repository = ModelCatalogRepository(session)
+    items = await repository.list_models()
+    if not items:
+        await sync_model_catalog_from_definitions(
+            repository,
+            load_model_definitions(settings.model_config_path),
+        )
+        await session.commit()
+        items = await repository.list_models()
+    return items
+
+
 @router.get("", summary="List available ML models")
 async def list_models(session: DbSessionDep) -> ModelListResponse:
     try:
-        repository = ModelCatalogRepository(session)
-        items = await repository.list_models()
-        if not items:
-            await sync_model_catalog_from_definitions(
-                repository,
-                load_model_definitions(settings.model_config_path),
-            )
-            await session.commit()
-            items = await repository.list_models()
+        items = await _get_catalog_models(session)
         return ModelListResponse(items=[to_model_info(item) for item in items])
     except Exception:
         await session.rollback()
@@ -47,8 +52,17 @@ async def list_models(session: DbSessionDep) -> ModelListResponse:
 
 
 @router.get("/{model_code}", summary="Get model metadata")
-async def get_model(model_code: str) -> ModelInfo:
+async def get_model(model_code: str, session: DbSessionDep) -> ModelInfo:
     try:
-        return _to_schema(model_registry.describe(model_code))
+        items = await _get_catalog_models(session)
+        for item in items:
+            if item.model_code == model_code:
+                return to_model_info(item)
+    except Exception:
+        await session.rollback()
+
+    try:
+        descriptor = model_registry.describe(model_code)
     except ModelNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _to_schema(descriptor)

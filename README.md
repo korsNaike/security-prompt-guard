@@ -305,18 +305,18 @@ make load-test
 
 Скриншоты ниже были сняты с локального Docker Compose demo run: регистрация, баланс, классификации, cache-hit, batch, analytics, Prometheus, Grafana и Streamlit.
 
-![Swagger API](review-artifacts/readme-demo/01-swagger-api-docs.png)
+![Swagger API](images-demo/01-swagger-api-docs.png)
 
-![Model catalog JSON](review-artifacts/readme-demo/02-model-catalog-json.png)
+![Model catalog JSON](images-demo/02-model-catalog-json.png)
 
-![API responses and database evidence](review-artifacts/readme-demo/03-api-db-evidence.png)
+![API responses and database evidence](images-demo/03-api-db-evidence.png)
 
-![Streamlit authenticated dashboard](review-artifacts/readme-demo/04-streamlit-authenticated-demo.png)
+![Streamlit authenticated dashboard](images-demo/04-streamlit-authenticated-demo.png)
 
-![Prometheus targets](review-artifacts/readme-demo/05-prometheus-targets.png)
+![Prometheus targets](images-demo/05-prometheus-targets.png)
 
-![Prometheus worker metrics query](review-artifacts/readme-demo/06-prometheus-worker-query.png)
+![Prometheus worker metrics query](images-demo/06-prometheus-worker-query.png)
 
-![API metrics endpoint](review-artifacts/readme-demo/07-api-metrics-endpoint.png)
+![API metrics endpoint](images-demo/07-api-metrics-endpoint.png)
 
-![Grafana dashboard](review-artifacts/readme-demo/08-grafana-dashboard.png)
+![Grafana dashboard](images-demo/08-grafana-dashboard.png)

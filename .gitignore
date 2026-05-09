@@ -8,3 +8,5 @@ __pycache__/
 .agents
 .idea
 .mcp.json
+review-artifacts
+output

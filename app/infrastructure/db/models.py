@@ -1,10 +1,22 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.billing.entities import BillingTransactionStatus
+from app.domain.classifications.entities import ClassificationStatus
 from app.domain.users.entities import UserRole
 from app.infrastructure.db.base import Base
 
@@ -134,6 +146,7 @@ class BillingTransactionModel(Base):
     )
     classification_request_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
+        ForeignKey("classification_requests.id"),
         nullable=True,
     )
     related_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -151,6 +164,86 @@ class BillingTransactionModel(Base):
             self.id = uuid.uuid4()
         if self.status is None:
             self.status = BillingTransactionStatus.COMPLETED.value
+        if self.created_at is None:
+            self.created_at = utc_now()
+
+
+class ClassificationRequestModel(Base):
+    __tablename__ = "classification_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    model_code: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    input_text: Mapped[str] = mapped_column(Text, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default=ClassificationStatus.PENDING.value,
+        index=True,
+    )
+    estimated_cost: Mapped[int] = mapped_column(Integer, nullable=False)
+    final_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    result: Mapped["ClassificationResultModel | None"] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        uselist=False,
+        lazy="selectin",
+    )
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
+        if self.status is None:
+            self.status = ClassificationStatus.PENDING.value
+        if self.created_at is None:
+            self.created_at = utc_now()
+
+
+class ClassificationResultModel(Base):
+    __tablename__ = "classification_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("classification_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    risk_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    recommended_action: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    result_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    model_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    request: Mapped[ClassificationRequestModel] = relationship(
+        back_populates="result",
+        lazy="selectin",
+    )
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
         if self.created_at is None:
             self.created_at = utc_now()
 

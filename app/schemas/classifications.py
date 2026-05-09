@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -21,13 +22,37 @@ class ClassificationResultResponse(BaseModel):
     request_id: UUID
     status: str
     model_code: str
-    product_name: str
-    label: str
-    risk_level: str
-    confidence: float
-    recommended_action: str
+    mode: str | None = None
+    product_name: str | None = None
+    label: str | None = None
+    risk_level: str | None = None
+    confidence: float | None = None
+    recommended_action: str | None = None
     explanation: str | None
-    cost: int
+    raw_scores: dict[str, float] | None = None
+    metadata: dict | None = None
+    cost: int | None = None
+    estimated_cost: int | None = None
+    final_cost: int | None = None
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
+
+
+class ClassificationItemResponse(BaseModel):
+    request_id: UUID
+    status: str
+    model_code: str
+    mode: str
+    estimated_cost: int
+    final_cost: int | None = None
+    label: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+class ClassificationListResponse(BaseModel):
+    items: list[ClassificationItemResponse]
 
 
 def new_request_id() -> UUID:

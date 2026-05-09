@@ -37,13 +37,10 @@ def test_sync_preview_runs_prompt_guard() -> None:
     assert payload["cost"] == 7
 
 
-def test_create_classification_returns_pending_request() -> None:
+def test_create_classification_requires_authentication() -> None:
     response = client.post(
         "/api/v1/classifications",
         json={"model_code": "text_mood", "mode": "basic", "text": "Спасибо, отлично"},
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "pending"
-    assert payload["estimated_cost"] == 2
+    assert response.status_code == 401

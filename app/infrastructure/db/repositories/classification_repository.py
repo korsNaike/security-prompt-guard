@@ -1,0 +1,147 @@
+import hashlib
+from datetime import UTC, datetime
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.domain.classifications.entities import ClassificationStatus
+from app.domain.ml.classifier_contracts import ClassificationOutput
+from app.infrastructure.db.models import ClassificationRequestModel, ClassificationResultModel
+
+
+class ClassificationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def create_request(
+        self,
+        *,
+        user_id: UUID,
+        model_code: str,
+        mode: str,
+        input_text: str,
+        estimated_cost: int,
+    ) -> ClassificationRequestModel:
+        request = ClassificationRequestModel(
+            user_id=user_id,
+            model_code=model_code,
+            mode=mode,
+            input_text=input_text,
+            input_hash=self.calculate_input_hash(input_text),
+            estimated_cost=estimated_cost,
+            status=ClassificationStatus.PENDING.value,
+        )
+        self.session.add(request)
+        await self.session.flush()
+        return request
+
+    async def get_by_id(self, request_id: UUID) -> ClassificationRequestModel | None:
+        result = await self.session.execute(
+            select(ClassificationRequestModel)
+            .options(selectinload(ClassificationRequestModel.result))
+            .where(ClassificationRequestModel.id == request_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_id_for_user(
+        self,
+        *,
+        request_id: UUID,
+        user_id: UUID,
+    ) -> ClassificationRequestModel | None:
+        result = await self.session.execute(
+            select(ClassificationRequestModel)
+            .options(selectinload(ClassificationRequestModel.result))
+            .where(
+                ClassificationRequestModel.id == request_id,
+                ClassificationRequestModel.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_for_user(
+        self,
+        *,
+        user_id: UUID,
+        limit: int = 50,
+    ) -> list[ClassificationRequestModel]:
+        result = await self.session.execute(
+            select(ClassificationRequestModel)
+            .options(selectinload(ClassificationRequestModel.result))
+            .where(ClassificationRequestModel.user_id == user_id)
+            .order_by(ClassificationRequestModel.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def set_celery_task_id(
+        self,
+        *,
+        request_id: UUID,
+        celery_task_id: str,
+    ) -> None:
+        request = await self.get_by_id(request_id)
+        if request is None:
+            return
+        request.celery_task_id = celery_task_id
+        await self.session.flush()
+
+    async def mark_processing(
+        self,
+        request: ClassificationRequestModel,
+    ) -> ClassificationRequestModel:
+        request.status = ClassificationStatus.PROCESSING.value
+        request.started_at = datetime.now(UTC)
+        request.error_message = None
+        await self.session.flush()
+        return request
+
+    async def save_success(
+        self,
+        *,
+        request: ClassificationRequestModel,
+        output: ClassificationOutput,
+        model_code: str,
+        model_version: str,
+        final_cost: int,
+    ) -> ClassificationResultModel:
+        request.status = ClassificationStatus.COMPLETED.value
+        request.final_cost = final_cost
+        request.completed_at = datetime.now(UTC)
+        request.error_message = None
+
+        result = ClassificationResultModel(
+            request_id=request.id,
+            label=output.label,
+            confidence=output.confidence,
+            risk_level=output.risk_level,
+            recommended_action=output.recommended_action,
+            explanation=output.explanation,
+            raw_scores=output.raw_scores,
+            result_metadata=output.metadata,
+            model_code=model_code,
+            model_version=model_version,
+        )
+        self.session.add(result)
+        await self.session.flush()
+        request.result = result
+        return result
+
+    async def mark_failed(
+        self,
+        *,
+        request: ClassificationRequestModel,
+        error_message: str,
+    ) -> ClassificationRequestModel:
+        request.status = ClassificationStatus.FAILED.value
+        request.completed_at = datetime.now(UTC)
+        request.error_message = error_message[:4000]
+        await self.session.flush()
+        return request
+
+    @staticmethod
+    def calculate_input_hash(input_text: str) -> str:
+        normalized = " ".join(input_text.strip().split()).casefold()
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()

@@ -93,6 +93,7 @@ class BillingRepository:
         amount: int,
         idempotency_key: str,
         description: str,
+        classification_request_id: UUID | None = None,
     ) -> BillingTransactionModel:
         existing = await self._get_transaction_by_idempotency_key(idempotency_key)
         if existing is not None:
@@ -113,6 +114,7 @@ class BillingRepository:
             transaction_type=BillingTransactionType.INFERENCE_HOLD,
             idempotency_key=idempotency_key,
             description=description,
+            classification_request_id=classification_request_id,
         )
 
     async def capture_reserved_credits(
@@ -123,6 +125,7 @@ class BillingRepository:
         idempotency_key: str,
         related_transaction_id: UUID,
         description: str,
+        classification_request_id: UUID | None = None,
     ) -> BillingTransactionModel:
         existing = await self._get_transaction_by_idempotency_key(idempotency_key)
         if existing is not None:
@@ -143,6 +146,7 @@ class BillingRepository:
             idempotency_key=idempotency_key,
             description=description,
             related_transaction_id=related_transaction_id,
+            classification_request_id=classification_request_id,
         )
 
     async def refund_reserved_credits(
@@ -153,6 +157,7 @@ class BillingRepository:
         idempotency_key: str,
         related_transaction_id: UUID,
         description: str,
+        classification_request_id: UUID | None = None,
     ) -> BillingTransactionModel:
         existing = await self._get_transaction_by_idempotency_key(idempotency_key)
         if existing is not None:
@@ -174,7 +179,14 @@ class BillingRepository:
             idempotency_key=idempotency_key,
             description=description,
             related_transaction_id=related_transaction_id,
+            classification_request_id=classification_request_id,
         )
+
+    async def get_transaction_by_idempotency_key(
+        self,
+        idempotency_key: str,
+    ) -> BillingTransactionModel | None:
+        return await self._get_transaction_by_idempotency_key(idempotency_key)
 
     async def activate_promo_code(self, *, user_id: UUID, code: str) -> BillingTransactionModel:
         normalized_code = code.strip().upper()
@@ -292,6 +304,7 @@ class BillingRepository:
         idempotency_key: str,
         description: str | None,
         related_transaction_id: UUID | None = None,
+        classification_request_id: UUID | None = None,
     ) -> BillingTransactionModel:
         transaction = BillingTransactionModel(
             user_id=user_id,
@@ -299,6 +312,7 @@ class BillingRepository:
             transaction_type=transaction_type.value,
             status=BillingTransactionStatus.COMPLETED.value,
             related_transaction_id=related_transaction_id,
+            classification_request_id=classification_request_id,
             idempotency_key=idempotency_key,
             description=description,
         )

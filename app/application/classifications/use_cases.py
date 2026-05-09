@@ -5,6 +5,8 @@ from uuid import UUID
 from app.infrastructure.db.repositories.billing_repository import BillingRepository
 from app.infrastructure.db.repositories.classification_repository import ClassificationRepository
 
+MAX_BATCH_ITEMS = 100
+
 
 class ClassificationNotFoundError(Exception):
     pass
@@ -74,8 +76,8 @@ class ClassificationService:
         mode: str,
         items: list[str],
     ) -> dict:
-        if not items or len(items) > 50:
-            raise ClassificationBatchSizeError("Batch size must be between 1 and 50")
+        if not items or len(items) > MAX_BATCH_ITEMS:
+            raise ClassificationBatchSizeError("Batch size must be between 1 and 100")
 
         estimated_cost_per_item = self.model_registry.get_cost(model_code, mode)
         batch = await self.repository.create_batch(

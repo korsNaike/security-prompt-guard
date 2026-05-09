@@ -3,12 +3,15 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api.deps import get_current_user
 from app.api.v1.classifications import get_classification_service
+from app.core.exceptions import ModelNotFoundError
 from app.domain.classifications.entities import ClassificationStatus
 from app.infrastructure.db.models import UserBalanceModel, UserModel
 from app.main import app
+from app.schemas.classifications import ClassificationCreateRequest
 
 
 class FakeClassificationService:
@@ -16,6 +19,8 @@ class FakeClassificationService:
         self.request_id = uuid4()
 
     async def create_classification(self, *, user_id, model_code: str, mode: str, text: str):
+        if model_code == "missing_model":
+            raise ModelNotFoundError("Model missing_model was not found")
         return type(
             "Request",
             (),
@@ -91,6 +96,22 @@ def test_create_classification_returns_persisted_pending_request(client: TestCli
     assert response.status_code == 200
     assert response.json()["status"] == "pending"
     assert response.json()["estimated_cost"] == 7
+
+
+def test_create_classification_unknown_model_returns_404(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/classifications",
+        json={"model_code": "missing_model", "mode": "standard", "text": "hello"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_single_classification_text_limit_is_5000() -> None:
+    ClassificationCreateRequest(model_code="prompt_guard", mode="standard", text="x" * 5000)
+
+    with pytest.raises(ValidationError):
+        ClassificationCreateRequest(model_code="prompt_guard", mode="standard", text="x" * 5001)
 
 
 def test_get_classification_returns_result(client: TestClient) -> None:

@@ -125,7 +125,10 @@ async def create_classification(
             text=payload.text,
         )
         await session.commit()
-    except (ModelNotFoundError, UnsupportedModeError) as exc:
+    except ModelNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnsupportedModeError as exc:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except InsufficientCreditsError as exc:
@@ -156,7 +159,10 @@ async def create_classification_batch(
             items=payload.items,
         )
         await session.commit()
-    except (ModelNotFoundError, UnsupportedModeError, ClassificationBatchSizeError) as exc:
+    except ModelNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (UnsupportedModeError, ClassificationBatchSizeError) as exc:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except InsufficientCreditsError as exc:

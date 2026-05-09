@@ -99,3 +99,24 @@ async def test_create_batch_rejects_empty_payload() -> None:
         return
 
     raise AssertionError("Expected ClassificationBatchSizeError")
+
+
+async def test_create_batch_accepts_100_items() -> None:
+    repository = FakeRepository()
+    billing_repository = FakeBillingRepository()
+    service = ClassificationService(
+        repository=repository,
+        billing_repository=billing_repository,
+        model_registry=FakeRegistry(),
+    )
+
+    result = await service.create_batch(
+        user_id=uuid4(),
+        model_code="prompt_guard",
+        mode="standard",
+        items=[f"text {index}" for index in range(100)],
+    )
+
+    assert result["batch"].total_requests == 100
+    assert len(result["requests"]) == 100
+    assert len(billing_repository.reservations) == 100

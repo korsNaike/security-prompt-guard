@@ -7,13 +7,13 @@ from pydantic import BaseModel, Field
 class ClassificationCreateRequest(BaseModel):
     model_code: str = Field(min_length=1, examples=["prompt_guard"])
     mode: str = Field(min_length=1, examples=["standard"])
-    text: str = Field(min_length=1, max_length=20_000)
+    text: str = Field(min_length=1, max_length=5_000)
 
 
 class ClassificationBatchCreateRequest(BaseModel):
     model_code: str = Field(min_length=1, examples=["prompt_guard"])
     mode: str = Field(min_length=1, examples=["standard"])
-    items: list[str] = Field(min_length=1, max_length=50, examples=[["one", "two"]])
+    items: list[str] = Field(min_length=1, max_length=100, examples=[["one", "two"]])
 
 
 class ClassificationCreateResponse(BaseModel):

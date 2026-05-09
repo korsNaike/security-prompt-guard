@@ -3,11 +3,14 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api.deps import get_current_user
 from app.api.v1.classifications import get_classification_service
+from app.core.exceptions import ModelNotFoundError
 from app.infrastructure.db.models import UserBalanceModel, UserModel
 from app.main import app
+from app.schemas.classifications import ClassificationBatchCreateRequest
 
 
 class FakeClassificationService:
@@ -16,6 +19,8 @@ class FakeClassificationService:
         self.request_ids = [uuid4(), uuid4()]
 
     async def create_batch(self, *, user_id, model_code: str, mode: str, items: list[str]):
+        if model_code == "missing_model":
+            raise ModelNotFoundError("Model missing_model was not found")
         batch = type(
             "Batch",
             (),
@@ -75,6 +80,34 @@ def test_create_batch_accepts_items_contract(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["total_requests"] == 2
     assert len(response.json()["request_ids"]) == 2
+
+
+def test_create_batch_unknown_model_returns_404(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/classifications/batch",
+        json={
+            "model_code": "missing_model",
+            "mode": "standard",
+            "items": ["one"],
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_batch_limit_is_100_items() -> None:
+    ClassificationBatchCreateRequest(
+        model_code="prompt_guard",
+        mode="standard",
+        items=["x"] * 100,
+    )
+
+    with pytest.raises(ValidationError):
+        ClassificationBatchCreateRequest(
+            model_code="prompt_guard",
+            mode="standard",
+            items=["x"] * 101,
+        )
 
 
 def test_create_batch_rejects_legacy_texts_field(client: TestClient) -> None:

@@ -49,13 +49,16 @@ async def test_batch_item_status_tracks_request_lifecycle(session_factory) -> No
             batch_id=batch.id,
             classification_request_id=request.id,
             item_index=0,
+            estimated_cost=7,
         )
         await repository.mark_batch_item_processing(request.id)
-        await repository.mark_batch_item_completed(request.id)
+        await repository.mark_batch_item_completed(request.id, final_cost=5)
         await session.commit()
 
     async with session_factory() as session:
         item = await ClassificationRepository(session).get_batch_item_by_request_id(request.id)
 
         assert item.status == "completed"
+        assert item.estimated_cost == 7
+        assert item.final_cost == 5
         assert item.completed_at is not None

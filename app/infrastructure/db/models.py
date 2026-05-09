@@ -334,6 +334,8 @@ class ClassificationBatchItemModel(Base):
         index=True,
     )
     item_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    estimated_cost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    final_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -350,6 +352,8 @@ class ClassificationBatchItemModel(Base):
         super().__init__(**kwargs)
         if self.id is None:
             self.id = uuid.uuid4()
+        if self.estimated_cost is None:
+            self.estimated_cost = 0
         if self.status is None:
             self.status = ClassificationStatus.PENDING.value
         if self.created_at is None:

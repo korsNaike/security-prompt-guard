@@ -67,11 +67,13 @@ class ClassificationRepository:
         batch_id: UUID,
         classification_request_id: UUID,
         item_index: int,
+        estimated_cost: int,
     ) -> ClassificationBatchItemModel:
         item = ClassificationBatchItemModel(
             batch_id=batch_id,
             classification_request_id=classification_request_id,
             item_index=item_index,
+            estimated_cost=estimated_cost,
             status=ClassificationStatus.PENDING.value,
         )
         self.session.add(item)
@@ -210,10 +212,15 @@ class ClassificationRepository:
             item.status = ClassificationStatus.PROCESSING.value
             await self.session.flush()
 
-    async def mark_batch_item_completed(self, request_id: UUID) -> None:
+    async def mark_batch_item_completed(
+        self,
+        request_id: UUID,
+        final_cost: int | None = None,
+    ) -> None:
         item = await self.get_batch_item_by_request_id(request_id)
         if item is not None:
             item.status = ClassificationStatus.COMPLETED.value
+            item.final_cost = final_cost
             item.completed_at = datetime.now(UTC)
             item.error_message = None
             await self.session.flush()

@@ -99,6 +99,7 @@ class ClassificationService:
                 batch_id=batch.id,
                 classification_request_id=request.id,
                 item_index=item_index,
+                estimated_cost=estimated_cost_per_item,
             )
             await self.billing_repository.reserve_credits(
                 user_id=user_id,

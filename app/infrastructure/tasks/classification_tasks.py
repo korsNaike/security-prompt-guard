@@ -104,7 +104,7 @@ async def process_classification_request(
                     classification_request_id=request.id,
                 )
             if request.batch_id is not None:
-                await repository.mark_batch_item_completed(request.id)
+                await repository.mark_batch_item_completed(request.id, final_cost=final_cost)
                 await repository.update_batch_progress(request.batch_id)
             await session.commit()
             if not cache_hit:

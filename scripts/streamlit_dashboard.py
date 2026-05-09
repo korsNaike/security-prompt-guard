@@ -17,8 +17,8 @@ def fetch_json(path: str, token: str | None = None) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
-st.set_page_config(page_title="UniClassify", layout="wide")
-st.title("UniClassify")
+st.set_page_config(page_title="SecurePrompt Guard", layout="wide")
+st.title("SecurePrompt Guard")
 
 try:
     health = fetch_json("/health")

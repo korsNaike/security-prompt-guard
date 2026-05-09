@@ -30,42 +30,42 @@ class MetricsRegistry:
 
     def render_prometheus(self) -> str:
         lines = [
-            "# HELP uniclassify_http_requests_total "
+            "# HELP secure_prompt_guard_http_requests_total "
             "HTTP requests by method, path and status family.",
-            "# TYPE uniclassify_http_requests_total counter",
+            "# TYPE secure_prompt_guard_http_requests_total counter",
         ]
         for (method, path, status), value in sorted(self.http_requests.items()):
             lines.append(
-                "uniclassify_http_requests_total"
+                "secure_prompt_guard_http_requests_total"
                 f'{{method="{method}",path="{path}",status="{status}"}} {value}'
             )
 
         lines.extend(
             [
-                "# HELP uniclassify_http_request_duration_seconds_sum Total HTTP latency.",
-                "# TYPE uniclassify_http_request_duration_seconds_sum counter",
+                "# HELP secure_prompt_guard_http_request_duration_seconds_sum Total HTTP latency.",
+                "# TYPE secure_prompt_guard_http_request_duration_seconds_sum counter",
             ]
         )
         for (method, path), value in sorted(self.http_duration_sum.items()):
             lines.append(
-                "uniclassify_http_request_duration_seconds_sum"
+                "secure_prompt_guard_http_request_duration_seconds_sum"
                 f'{{method="{method}",path="{path}"}} {value:.6f}'
             )
         for (method, path), value in sorted(self.http_duration_count.items()):
             lines.append(
-                "uniclassify_http_request_duration_seconds_count"
+                "secure_prompt_guard_http_request_duration_seconds_count"
                 f'{{method="{method}",path="{path}"}} {value}'
             )
 
         lines.extend(
             [
-                "# HELP uniclassify_worker_outcomes_total Classification worker outcomes.",
-                "# TYPE uniclassify_worker_outcomes_total counter",
+                "# HELP secure_prompt_guard_worker_outcomes_total Classification worker outcomes.",
+                "# TYPE secure_prompt_guard_worker_outcomes_total counter",
             ]
         )
         for (model_code, status, cache_hit), value in sorted(self.worker_outcomes.items()):
             lines.append(
-                "uniclassify_worker_outcomes_total"
+                "secure_prompt_guard_worker_outcomes_total"
                 f'{{model_code="{model_code}",status="{status}",cache_hit="{cache_hit}"}} {value}'
             )
 

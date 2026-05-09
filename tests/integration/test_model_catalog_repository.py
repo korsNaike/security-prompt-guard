@@ -36,7 +36,7 @@ async def test_upsert_model_catalog_and_pricing(session_factory) -> None:
             model_name="PromptGuardClassifier",
             model_version="0.1.1",
             task_type="prompt_security_classification",
-            labels=["safe", "prompt_injection", "jailbreak"],
+            labels=["safe", "prompt_injection", "data_exfiltration"],
             pricing={"basic": 4, "standard": 8},
         )
         await session.commit()

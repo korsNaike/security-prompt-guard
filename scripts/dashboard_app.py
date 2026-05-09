@@ -7,8 +7,8 @@ def main() -> None:
     except ImportError as exc:
         raise RuntimeError("Install `streamlit` to run the optional dashboard.") from exc
 
-    st.set_page_config(page_title="UniClassify Analytics", layout="wide")
-    st.title("UniClassify Analytics")
+    st.set_page_config(page_title="SecurePrompt Guard Analytics", layout="wide")
+    st.title("SecurePrompt Guard Analytics")
     st.caption("Operational dashboard placeholder. Do not display raw classified text.")
     st.metric("Requests", "Use Prometheus/Grafana")
     st.metric("Billing", "Use admin API")

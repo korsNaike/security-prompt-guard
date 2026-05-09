@@ -48,15 +48,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: uniclassify
-      POSTGRES_USER: uniclassify
-      POSTGRES_PASSWORD: uniclassify
+      POSTGRES_DB: secure_prompt_guard
+      POSTGRES_USER: secure_prompt_guard
+      POSTGRES_PASSWORD: secure_prompt_guard
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U uniclassify -d uniclassify"]
+      test: ["CMD-SHELL", "pg_isready -U secure_prompt_guard -d secure_prompt_guard"]
       interval: 5s
       timeout: 3s
       retries: 20

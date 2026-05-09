@@ -2,7 +2,7 @@ from app.main import app
 
 
 def test_app_metadata() -> None:
-    assert app.title == "UniClassify Platform"
+    assert app.title == "SecurePrompt Guard"
     assert app.version == "0.1.0"
 
 

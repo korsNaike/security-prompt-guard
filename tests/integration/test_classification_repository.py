@@ -86,14 +86,14 @@ async def test_classification_history_is_user_scoped(session_factory) -> None:
         repository = ClassificationRepository(session)
         await repository.create_request(
             user_id=first_user_id,
-            model_code="text_mood",
+            model_code="prompt_guard",
             mode="basic",
             input_text="Спасибо",
             estimated_cost=2,
         )
         await repository.create_request(
             user_id=second_user_id,
-            model_code="text_mood",
+            model_code="prompt_guard",
             mode="basic",
             input_text="Плохо",
             estimated_cost=2,

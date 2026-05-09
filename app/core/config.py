@@ -5,11 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "UniClassify Platform"
+    app_name: str = "SecurePrompt Guard"
     app_version: str = "0.1.0"
     environment: str = "local"
     database_url: str = Field(
-        default="postgresql+asyncpg://uniclassify:uniclassify@postgres:5432/uniclassify"
+        default="postgresql+asyncpg://secure_prompt_guard:secure_prompt_guard@postgres:5432/secure_prompt_guard"
     )
     redis_url: str = "redis://redis:6379/0"
     model_config_path: str = "config/models.yml"

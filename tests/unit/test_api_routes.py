@@ -9,7 +9,7 @@ def test_health_endpoint() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "UniClassify Platform"}
+    assert response.json() == {"status": "ok", "service": "SecurePrompt Guard"}
 
 
 def test_models_endpoint_lists_plugins() -> None:
@@ -17,7 +17,7 @@ def test_models_endpoint_lists_plugins() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert {item["model_code"] for item in payload["items"]} == {"prompt_guard", "text_mood"}
+    assert {item["model_code"] for item in payload["items"]} == {"prompt_guard"}
 
 
 def test_sync_preview_runs_prompt_guard() -> None:
@@ -40,7 +40,7 @@ def test_sync_preview_runs_prompt_guard() -> None:
 def test_create_classification_requires_authentication() -> None:
     response = client.post(
         "/api/v1/classifications",
-        json={"model_code": "text_mood", "mode": "basic", "text": "Спасибо, отлично"},
+        json={"model_code": "prompt_guard", "mode": "basic", "text": "Спасибо, отлично"},
     )
 
     assert response.status_code == 401

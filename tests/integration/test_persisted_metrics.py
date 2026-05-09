@@ -57,9 +57,9 @@ async def test_persisted_worker_metrics_render_from_db(session_factory) -> None:
         rendered = await render_persisted_prometheus_metrics(session)
 
     assert (
-        'uniclassify_worker_outcomes_total{model_code="prompt_guard",'
+        'secure_prompt_guard_worker_outcomes_total{model_code="prompt_guard",'
         'status="completed",cache_hit="true"} 1'
     ) in rendered
     assert (
-        'uniclassify_cache_hits_total{model_code="prompt_guard",status="completed"} 1'
+        'secure_prompt_guard_cache_hits_total{model_code="prompt_guard",status="completed"} 1'
     ) in rendered

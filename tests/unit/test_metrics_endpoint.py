@@ -12,9 +12,9 @@ def test_metrics_endpoint_exposes_prometheus_text() -> None:
     response = client.get("/metrics")
 
     assert response.status_code == 200
-    assert "uniclassify_http_requests_total" in response.text
+    assert "secure_prompt_guard_http_requests_total" in response.text
     assert 'path="/health"' in response.text
     assert (
-        "uniclassify_worker_outcomes_total" in response.text
+        "secure_prompt_guard_worker_outcomes_total" in response.text
         or "# persisted metrics unavailable" in response.text
     )

@@ -29,19 +29,19 @@ async def render_persisted_prometheus_metrics(session: AsyncSession) -> str:
     lines: list[str] = []
     for (model_code, status, cache_hit), count in sorted(worker_outcomes.items()):
         lines.append(
-            "uniclassify_worker_outcomes_total"
+            "secure_prompt_guard_worker_outcomes_total"
             f'{{model_code="{model_code}",status="{status}",cache_hit="{cache_hit}"}} {count}'
         )
 
     lines.extend(
         [
-            "# HELP uniclassify_cache_hits_total Persisted classification cache hits.",
-            "# TYPE uniclassify_cache_hits_total counter",
+            "# HELP secure_prompt_guard_cache_hits_total Persisted classification cache hits.",
+            "# TYPE secure_prompt_guard_cache_hits_total counter",
         ]
     )
     for (model_code, status), count in sorted(cache_hits.items()):
         lines.append(
-            "uniclassify_cache_hits_total"
+            "secure_prompt_guard_cache_hits_total"
             f'{{model_code="{model_code}",status="{status}"}} {count}'
         )
 

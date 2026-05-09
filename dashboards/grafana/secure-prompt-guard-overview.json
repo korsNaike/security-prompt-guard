@@ -1,15 +1,15 @@
 {
-  "title": "UniClassify Overview",
+  "title": "SecurePrompt Guard Overview",
   "schemaVersion": 39,
   "version": 1,
-  "tags": ["uniclassify", "ml"],
+  "tags": ["secure_prompt_guard", "ml"],
   "panels": [
     {
       "type": "timeseries",
       "title": "HTTP Requests",
       "targets": [
         {
-          "expr": "sum(rate(uniclassify_http_requests_total[5m])) by (status)"
+          "expr": "sum(rate(secure_prompt_guard_http_requests_total[5m])) by (status)"
         }
       ]
     },
@@ -18,7 +18,7 @@
       "title": "HTTP Latency Average",
       "targets": [
         {
-          "expr": "sum(rate(uniclassify_http_request_duration_seconds_sum[5m])) / sum(rate(uniclassify_http_request_duration_seconds_count[5m]))"
+          "expr": "sum(rate(secure_prompt_guard_http_request_duration_seconds_sum[5m])) / sum(rate(secure_prompt_guard_http_request_duration_seconds_count[5m]))"
         }
       ]
     },
@@ -27,7 +27,7 @@
       "title": "Worker Outcomes",
       "targets": [
         {
-          "expr": "sum(rate(uniclassify_worker_outcomes_total[5m])) by (model_code, status, cache_hit)"
+          "expr": "sum(rate(secure_prompt_guard_worker_outcomes_total[5m])) by (model_code, status, cache_hit)"
         }
       ]
     }

@@ -21,14 +21,14 @@ def fetch_text(base_url: str, path: str) -> str:
 
 
 def main() -> int:
-    base_url = os.getenv("UNICLASSIFY_BASE_URL", "http://127.0.0.1:8000")
+    base_url = os.getenv("SECURE_PROMPT_GUARD_BASE_URL", "http://127.0.0.1:8000")
     checks = {
         "/health": fetch_json(base_url, "/health"),
         "/openapi.json": fetch_json(base_url, "/openapi.json"),
         "/api/v1/models": fetch_json(base_url, "/api/v1/models"),
     }
     metrics = fetch_text(base_url, "/metrics")
-    if "uniclassify_http_requests_total" not in metrics:
+    if "secure_prompt_guard_http_requests_total" not in metrics:
         raise RuntimeError("/metrics did not expose expected metric family")
     print(json.dumps({"base_url": base_url, "checks": list(checks)}, indent=2))
     return 0

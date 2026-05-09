@@ -39,10 +39,7 @@ def test_admin_models_returns_catalog_for_admin(client: TestClient) -> None:
     response = client.get("/api/v1/admin/models")
 
     assert response.status_code == 200
-    assert {item["model_code"] for item in response.json()["items"]} == {
-        "prompt_guard",
-        "text_mood",
-    }
+    assert {item["model_code"] for item in response.json()["items"]} == {"prompt_guard"}
 
 
 def test_admin_router_exposes_required_contract_endpoints(client: TestClient) -> None:

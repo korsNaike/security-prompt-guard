@@ -1,1 +1,1 @@
-"""UniClassify Platform application package."""
+"""SecurePrompt Guard application package."""

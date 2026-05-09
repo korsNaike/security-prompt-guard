@@ -52,6 +52,10 @@ class FakeRepository:
 class FakeBillingRepository:
     def __init__(self) -> None:
         self.reservations = []
+        self.loyalty_tier = None
+
+    async def get_loyalty_tier(self, user_id):
+        return self.loyalty_tier
 
     async def reserve_credits(self, **kwargs):
         self.reservations.append(kwargs)
@@ -120,3 +124,24 @@ async def test_create_batch_accepts_100_items() -> None:
     assert result["batch"].total_requests == 100
     assert len(result["requests"]) == 100
     assert len(billing_repository.reservations) == 100
+
+
+async def test_create_batch_applies_loyalty_discount() -> None:
+    repository = FakeRepository()
+    billing_repository = FakeBillingRepository()
+    billing_repository.loyalty_tier = type("Tier", (), {"discount_percent": 10})()
+    service = ClassificationService(
+        repository=repository,
+        billing_repository=billing_repository,
+        model_registry=FakeRegistry(),
+    )
+
+    result = await service.create_batch(
+        user_id=uuid4(),
+        model_code="prompt_guard",
+        mode="standard",
+        items=["one", "two"],
+    )
+
+    assert result["batch"].estimated_cost == 14
+    assert [reservation["amount"] for reservation in billing_repository.reservations] == [7, 7]

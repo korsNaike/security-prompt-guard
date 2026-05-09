@@ -1,15 +1,23 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.domain.classifications.entities import ClassificationStatus
 from app.infrastructure.db.base import Base
-from app.infrastructure.db.models import ClassificationRequestModel, PromoCodeModel
+from app.infrastructure.db.models import (
+    ClassificationRequestModel,
+    LoyaltyTierHistoryModel,
+    LoyaltyTierModel,
+    PromoCodeModel,
+    UserModel,
+)
 from app.infrastructure.db.repositories.user_repository import UserRepository
 from app.infrastructure.tasks.maintenance_tasks import (
     cleanup_stale_classification_requests_once,
     deactivate_expired_promo_codes_once,
+    recalculate_loyalty_tiers_once,
 )
 
 
@@ -68,3 +76,42 @@ async def test_cleanup_stale_processing_requests_marks_failed(session_factory) -
     result = await cleanup_stale_classification_requests_once(session_factory=session_factory)
 
     assert result == {"failed": 1}
+
+
+async def test_recalculate_loyalty_tiers_bootstraps_and_updates_user(session_factory) -> None:
+    now = datetime.now(UTC)
+    async with session_factory() as session:
+        user = await UserRepository(session).create_user_with_balance(
+            email="loyalty@example.com",
+            hashed_password="hashed",
+            initial_credits=100,
+        )
+        for index in range(25):
+            session.add(
+                ClassificationRequestModel(
+                    user_id=user.id,
+                    model_code="prompt_guard",
+                    mode="standard",
+                    input_text=f"text {index}",
+                    input_hash=f"hash-{index}",
+                    status=ClassificationStatus.COMPLETED.value,
+                    estimated_cost=7,
+                    final_cost=7,
+                    completed_at=now,
+                )
+            )
+        await session.commit()
+
+    result = await recalculate_loyalty_tiers_once(
+        session_factory=session_factory,
+        now=now,
+    )
+
+    assert result["updated"] == 1
+    async with session_factory() as session:
+        refreshed = await session.get(UserModel, user.id)
+        tier = await session.get(LoyaltyTierModel, refreshed.loyalty_tier_id)
+        history_count = len((await session.execute(select(LoyaltyTierHistoryModel))).scalars().all())
+
+        assert tier.code == "silver"
+        assert history_count == 1

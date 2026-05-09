@@ -37,6 +37,10 @@ class FakeClassificationRepository:
 class FakeBillingRepository:
     def __init__(self) -> None:
         self.reservations = []
+        self.loyalty_tier = None
+
+    async def get_loyalty_tier(self, user_id):
+        return self.loyalty_tier
 
     async def reserve_credits(self, **kwargs):
         self.reservations.append(kwargs)
@@ -73,6 +77,29 @@ async def test_create_classification_reserves_credits_and_enqueues_task() -> Non
     )
     assert sent_requests == [request.id]
     assert repository.task_ids == [(request.id, "task-1")]
+
+
+async def test_create_classification_applies_loyalty_discount() -> None:
+    user_id = uuid4()
+    repository = FakeClassificationRepository()
+    billing_repository = FakeBillingRepository()
+    billing_repository.loyalty_tier = type("Tier", (), {"discount_percent": 10})()
+
+    service = ClassificationService(
+        repository=repository,
+        billing_repository=billing_repository,
+        model_registry=FakeRegistry(),
+    )
+
+    request = await service.create_classification(
+        user_id=user_id,
+        model_code="prompt_guard",
+        mode="standard",
+        text="Hello",
+    )
+
+    assert request.estimated_cost == 7
+    assert billing_repository.reservations[0]["amount"] == 7
 
 
 async def test_idempotency_key_helpers_are_stable() -> None:

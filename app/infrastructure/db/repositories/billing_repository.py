@@ -1,12 +1,15 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.billing.entities import BillingTransactionStatus, BillingTransactionType
+from app.domain.classifications.entities import ClassificationStatus
 from app.infrastructure.db.models import (
     BillingTransactionModel,
+    ClassificationRequestModel,
+    LoyaltyTierHistoryModel,
     LoyaltyTierModel,
     PromoCodeActivationModel,
     PromoCodeModel,
@@ -29,6 +32,28 @@ class PromoCodeInvalidError(Exception):
 
 class PromoCodeAlreadyActivatedError(Exception):
     pass
+
+
+DEFAULT_LOYALTY_TIERS = (
+    {
+        "code": "bronze",
+        "name": "Bronze",
+        "min_monthly_predictions": 0,
+        "discount_percent": 0,
+    },
+    {
+        "code": "silver",
+        "name": "Silver",
+        "min_monthly_predictions": 20,
+        "discount_percent": 10,
+    },
+    {
+        "code": "gold",
+        "name": "Gold",
+        "min_monthly_predictions": 100,
+        "discount_percent": 20,
+    },
+)
 
 
 class BillingRepository:
@@ -60,6 +85,78 @@ class BillingRepository:
             select(LoyaltyTierModel).where(LoyaltyTierModel.id == user.loyalty_tier_id)
         )
         return tier_result.scalar_one_or_none()
+
+    async def bootstrap_loyalty_tiers(self) -> list[LoyaltyTierModel]:
+        result = await self.session.execute(select(LoyaltyTierModel))
+        existing_by_code = {tier.code: tier for tier in result.scalars().all()}
+        for tier_data in DEFAULT_LOYALTY_TIERS:
+            if tier_data["code"] not in existing_by_code:
+                self.session.add(LoyaltyTierModel(**tier_data))
+        await self.session.flush()
+
+        tiers_result = await self.session.execute(
+            select(LoyaltyTierModel)
+            .where(LoyaltyTierModel.is_active.is_(True))
+            .order_by(LoyaltyTierModel.min_monthly_predictions.desc())
+        )
+        return list(tiers_result.scalars().all())
+
+    async def recalculate_loyalty_tiers(
+        self,
+        *,
+        period_start: datetime,
+        period_end: datetime,
+    ) -> int:
+        tiers = await self.bootstrap_loyalty_tiers()
+        if not tiers:
+            return 0
+
+        usage_result = await self.session.execute(
+            select(
+                ClassificationRequestModel.user_id,
+                func.count(ClassificationRequestModel.id),
+            )
+            .where(
+                ClassificationRequestModel.status == ClassificationStatus.COMPLETED.value,
+                ClassificationRequestModel.completed_at >= period_start,
+                ClassificationRequestModel.completed_at < period_end,
+            )
+            .group_by(ClassificationRequestModel.user_id)
+        )
+        usage_by_user = {user_id: int(count) for user_id, count in usage_result.all()}
+        if not usage_by_user:
+            return 0
+
+        users_result = await self.session.execute(
+            select(UserModel).where(UserModel.id.in_(usage_by_user.keys()))
+        )
+        updated = 0
+        for user in users_result.scalars().all():
+            predictions_count = usage_by_user[user.id]
+            next_tier = next(
+                tier
+                for tier in tiers
+                if predictions_count >= tier.min_monthly_predictions
+            )
+            if user.loyalty_tier_id == next_tier.id:
+                continue
+            old_tier_id = user.loyalty_tier_id
+            user.loyalty_tier_id = next_tier.id
+            user.updated_at = datetime.now(UTC)
+            self.session.add(
+                LoyaltyTierHistoryModel(
+                    user_id=user.id,
+                    old_tier_id=old_tier_id,
+                    new_tier_id=next_tier.id,
+                    period_start=period_start,
+                    period_end=period_end,
+                    predictions_count=predictions_count,
+                )
+            )
+            updated += 1
+
+        await self.session.flush()
+        return updated
 
     async def create_initial_grant(self, *, user_id: UUID, amount: int) -> BillingTransactionModel:
         return await self._add_positive_balance_transaction(

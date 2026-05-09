@@ -2,6 +2,7 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
+from app.domain.billing.services import calculate_discounted_cost
 from app.infrastructure.db.repositories.billing_repository import BillingRepository
 from app.infrastructure.db.repositories.classification_repository import ClassificationRepository
 
@@ -42,7 +43,11 @@ class ClassificationService:
         mode: str,
         text: str,
     ):
-        estimated_cost = self.model_registry.get_cost(model_code, mode)
+        estimated_cost = await self._estimate_cost(
+            user_id=user_id,
+            model_code=model_code,
+            mode=mode,
+        )
         request = await self.repository.create_request(
             user_id=user_id,
             model_code=model_code,
@@ -79,7 +84,11 @@ class ClassificationService:
         if not items or len(items) > MAX_BATCH_ITEMS:
             raise ClassificationBatchSizeError("Batch size must be between 1 and 100")
 
-        estimated_cost_per_item = self.model_registry.get_cost(model_code, mode)
+        estimated_cost_per_item = await self._estimate_cost(
+            user_id=user_id,
+            model_code=model_code,
+            mode=mode,
+        )
         batch = await self.repository.create_batch(
             user_id=user_id,
             total_requests=len(items),
@@ -148,3 +157,12 @@ class ClassificationService:
     @staticmethod
     def refund_idempotency_key(request_id: UUID) -> str:
         return f"classification:{request_id}:refund"
+
+    async def _estimate_cost(self, *, user_id: UUID, model_code: str, mode: str) -> int:
+        base_cost = self.model_registry.get_cost(model_code, mode)
+        tier = await self.billing_repository.get_loyalty_tier(user_id)
+        discount_percent = tier.discount_percent if tier is not None else 0
+        return calculate_discounted_cost(
+            base_cost=base_cost,
+            discount_percent=discount_percent,
+        )

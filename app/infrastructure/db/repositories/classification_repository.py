@@ -8,7 +8,11 @@ from sqlalchemy.orm import selectinload
 
 from app.domain.classifications.entities import ClassificationStatus
 from app.domain.ml.classifier_contracts import ClassificationOutput
-from app.infrastructure.db.models import ClassificationRequestModel, ClassificationResultModel
+from app.infrastructure.db.models import (
+    ClassificationBatchModel,
+    ClassificationRequestModel,
+    ClassificationResultModel,
+)
 
 
 class ClassificationRepository:
@@ -23,9 +27,11 @@ class ClassificationRepository:
         mode: str,
         input_text: str,
         estimated_cost: int,
+        batch_id: UUID | None = None,
     ) -> ClassificationRequestModel:
         request = ClassificationRequestModel(
             user_id=user_id,
+            batch_id=batch_id,
             model_code=model_code,
             mode=mode,
             input_text=input_text,
@@ -36,6 +42,23 @@ class ClassificationRepository:
         self.session.add(request)
         await self.session.flush()
         return request
+
+    async def create_batch(
+        self,
+        *,
+        user_id: UUID,
+        total_requests: int,
+        estimated_cost: int,
+    ) -> ClassificationBatchModel:
+        batch = ClassificationBatchModel(
+            user_id=user_id,
+            total_requests=total_requests,
+            estimated_cost=estimated_cost,
+            status=ClassificationStatus.PENDING.value,
+        )
+        self.session.add(batch)
+        await self.session.flush()
+        return batch
 
     async def get_by_id(self, request_id: UUID) -> ClassificationRequestModel | None:
         result = await self.session.execute(
@@ -75,6 +98,60 @@ class ClassificationRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_batch_for_user(
+        self,
+        *,
+        batch_id: UUID,
+        user_id: UUID,
+    ) -> ClassificationBatchModel | None:
+        result = await self.session.execute(
+            select(ClassificationBatchModel)
+            .options(selectinload(ClassificationBatchModel.requests))
+            .where(
+                ClassificationBatchModel.id == batch_id,
+                ClassificationBatchModel.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def update_batch_progress(self, batch_id: UUID) -> ClassificationBatchModel | None:
+        result = await self.session.execute(
+            select(ClassificationBatchModel)
+            .options(selectinload(ClassificationBatchModel.requests))
+            .where(ClassificationBatchModel.id == batch_id)
+        )
+        batch = result.scalar_one_or_none()
+        if batch is None:
+            return None
+
+        completed = sum(
+            1
+            for request in batch.requests
+            if request.status == ClassificationStatus.COMPLETED.value
+        )
+        failed = sum(
+            1 for request in batch.requests if request.status == ClassificationStatus.FAILED.value
+        )
+        batch.completed_requests = completed
+        batch.failed_requests = failed
+        batch.final_cost = sum(request.final_cost or 0 for request in batch.requests)
+
+        finished = completed + failed
+        if finished < batch.total_requests:
+            batch.status = ClassificationStatus.PROCESSING.value if finished else batch.status
+        elif failed == 0:
+            batch.status = ClassificationStatus.COMPLETED.value
+            batch.completed_at = datetime.now(UTC)
+        elif completed == 0:
+            batch.status = ClassificationStatus.FAILED.value
+            batch.completed_at = datetime.now(UTC)
+        else:
+            batch.status = ClassificationStatus.PARTIAL_SUCCESS.value
+            batch.completed_at = datetime.now(UTC)
+
+        await self.session.flush()
+        return batch
 
     async def set_celery_task_id(
         self,

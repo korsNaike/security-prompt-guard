@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import CurrentUserDep, DbSessionDep
 from app.application.classifications.use_cases import (
+    ClassificationBatchNotFoundError,
+    ClassificationBatchSizeError,
     ClassificationNotFoundError,
     ClassificationService,
 )
@@ -19,6 +21,9 @@ from app.infrastructure.db.repositories.classification_repository import Classif
 from app.infrastructure.ml.loader import model_registry
 from app.infrastructure.tasks.classification_tasks import run_classification_task
 from app.schemas.classifications import (
+    ClassificationBatchCreateRequest,
+    ClassificationBatchCreateResponse,
+    ClassificationBatchResponse,
     ClassificationCreateRequest,
     ClassificationCreateResponse,
     ClassificationItemResponse,
@@ -90,6 +95,21 @@ def to_item_response(request) -> ClassificationItemResponse:
     )
 
 
+def to_batch_response(batch) -> ClassificationBatchResponse:
+    return ClassificationBatchResponse(
+        batch_id=batch.id,
+        status=batch.status,
+        total_requests=batch.total_requests,
+        completed_requests=batch.completed_requests,
+        failed_requests=batch.failed_requests,
+        estimated_cost=batch.estimated_cost,
+        final_cost=batch.final_cost,
+        request_ids=[request.id for request in batch.requests],
+        created_at=batch.created_at,
+        completed_at=batch.completed_at,
+    )
+
+
 @router.post("", summary="Create classification request")
 async def create_classification(
     payload: ClassificationCreateRequest,
@@ -119,6 +139,52 @@ async def create_classification(
         mode=request.mode,
         estimated_cost=request.estimated_cost,
     )
+
+
+@router.post("/batch", summary="Create batch classification request")
+async def create_classification_batch(
+    payload: ClassificationBatchCreateRequest,
+    current_user: CurrentUserDep,
+    classification_service: ClassificationServiceDep,
+    session: DbSessionDep,
+) -> ClassificationBatchCreateResponse:
+    try:
+        result = await classification_service.create_batch(
+            user_id=current_user.id,
+            model_code=payload.model_code,
+            mode=payload.mode,
+            texts=payload.texts,
+        )
+        await session.commit()
+    except (ModelNotFoundError, UnsupportedModeError, ClassificationBatchSizeError) as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InsufficientCreditsError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
+
+    batch = result["batch"]
+    requests = result["requests"]
+    return ClassificationBatchCreateResponse(
+        batch_id=batch.id,
+        status=batch.status,
+        total_requests=batch.total_requests,
+        estimated_cost=batch.estimated_cost,
+        request_ids=[request.id for request in requests],
+    )
+
+
+@router.get("/batch/{batch_id}", summary="Get classification batch")
+async def get_classification_batch(
+    batch_id: UUID,
+    current_user: CurrentUserDep,
+    classification_service: ClassificationServiceDep,
+) -> ClassificationBatchResponse:
+    try:
+        batch = await classification_service.get_batch(user_id=current_user.id, batch_id=batch_id)
+    except ClassificationBatchNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return to_batch_response(batch)
 
 
 @router.get("", summary="List classification requests")

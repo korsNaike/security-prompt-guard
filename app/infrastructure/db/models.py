@@ -168,6 +168,53 @@ class BillingTransactionModel(Base):
             self.created_at = utc_now()
 
 
+class ClassificationBatchModel(Base):
+    __tablename__ = "classification_batches"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default=ClassificationStatus.PENDING.value,
+        index=True,
+    )
+    total_requests: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    estimated_cost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    final_cost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    requests: Mapped[list["ClassificationRequestModel"]] = relationship(
+        back_populates="batch",
+        lazy="selectin",
+    )
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
+        if self.status is None:
+            self.status = ClassificationStatus.PENDING.value
+        if self.completed_requests is None:
+            self.completed_requests = 0
+        if self.failed_requests is None:
+            self.failed_requests = 0
+        if self.estimated_cost is None:
+            self.estimated_cost = 0
+        if self.final_cost is None:
+            self.final_cost = 0
+        if self.created_at is None:
+            self.created_at = utc_now()
+
+
 class ClassificationRequestModel(Base):
     __tablename__ = "classification_requests"
 
@@ -176,6 +223,12 @@ class ClassificationRequestModel(Base):
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
+    )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("classification_batches.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     model_code: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
@@ -200,6 +253,10 @@ class ClassificationRequestModel(Base):
         back_populates="request",
         cascade="all, delete-orphan",
         uselist=False,
+        lazy="selectin",
+    )
+    batch: Mapped["ClassificationBatchModel | None"] = relationship(
+        back_populates="requests",
         lazy="selectin",
     )
 

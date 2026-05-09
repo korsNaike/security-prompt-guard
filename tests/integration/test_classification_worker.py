@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.domain.classifications.entities import ClassificationStatus
+from app.infrastructure.cache.classification_cache import classification_cache
 from app.infrastructure.db.base import Base
 from app.infrastructure.db.repositories.billing_repository import BillingRepository
 from app.infrastructure.db.repositories.classification_repository import ClassificationRepository
@@ -11,6 +12,7 @@ from app.infrastructure.tasks.classification_tasks import process_classification
 
 @pytest.fixture
 async def session_factory():
+    classification_cache.clear()
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
@@ -19,6 +21,7 @@ async def session_factory():
     try:
         yield factory
     finally:
+        classification_cache.clear()
         await engine.dispose()
 
 

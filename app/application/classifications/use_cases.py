@@ -10,6 +10,14 @@ class ClassificationNotFoundError(Exception):
     pass
 
 
+class ClassificationBatchNotFoundError(Exception):
+    pass
+
+
+class ClassificationBatchSizeError(Exception):
+    pass
+
+
 class ClassificationService:
     def __init__(
         self,
@@ -58,6 +66,54 @@ class ClassificationService:
                 )
         return request
 
+    async def create_batch(
+        self,
+        *,
+        user_id: UUID,
+        model_code: str,
+        mode: str,
+        texts: list[str],
+    ) -> dict:
+        if not texts or len(texts) > 50:
+            raise ClassificationBatchSizeError("Batch size must be between 1 and 50")
+
+        estimated_cost_per_item = self.model_registry.get_cost(model_code, mode)
+        batch = await self.repository.create_batch(
+            user_id=user_id,
+            total_requests=len(texts),
+            estimated_cost=estimated_cost_per_item * len(texts),
+        )
+        requests = []
+        for text in texts:
+            request = await self.repository.create_request(
+                user_id=user_id,
+                batch_id=batch.id,
+                model_code=model_code,
+                mode=mode,
+                input_text=text,
+                estimated_cost=estimated_cost_per_item,
+            )
+            await self.billing_repository.reserve_credits(
+                user_id=user_id,
+                amount=estimated_cost_per_item,
+                idempotency_key=self.hold_idempotency_key(request.id),
+                description=f"Reserve classification {request.id}",
+                classification_request_id=request.id,
+            )
+            requests.append(request)
+
+        for request in requests:
+            if self.task_sender is not None:
+                task = self.task_sender(request.id)
+                task_id = getattr(task, "id", None) or (task if isinstance(task, str) else None)
+                if task_id is not None:
+                    await self.repository.set_celery_task_id(
+                        request_id=request.id,
+                        celery_task_id=str(task_id),
+                    )
+
+        return {"batch": batch, "requests": requests}
+
     async def get_classification(self, *, user_id: UUID, request_id: UUID):
         request = await self.repository.get_by_id_for_user(request_id=request_id, user_id=user_id)
         if request is None:
@@ -66,6 +122,12 @@ class ClassificationService:
 
     async def list_classifications(self, *, user_id: UUID, limit: int = 50):
         return await self.repository.list_for_user(user_id=user_id, limit=limit)
+
+    async def get_batch(self, *, user_id: UUID, batch_id: UUID):
+        batch = await self.repository.get_batch_for_user(batch_id=batch_id, user_id=user_id)
+        if batch is None:
+            raise ClassificationBatchNotFoundError("Classification batch was not found")
+        return batch
 
     @staticmethod
     def hold_idempotency_key(request_id: UUID) -> str:

@@ -10,6 +10,12 @@ class ClassificationCreateRequest(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
 
 
+class ClassificationBatchCreateRequest(BaseModel):
+    model_code: str = Field(min_length=1, examples=["prompt_guard"])
+    mode: str = Field(min_length=1, examples=["standard"])
+    texts: list[str] = Field(min_length=1, max_length=50)
+
+
 class ClassificationCreateResponse(BaseModel):
     request_id: UUID
     status: str
@@ -53,6 +59,27 @@ class ClassificationItemResponse(BaseModel):
 
 class ClassificationListResponse(BaseModel):
     items: list[ClassificationItemResponse]
+
+
+class ClassificationBatchCreateResponse(BaseModel):
+    batch_id: UUID
+    status: str
+    total_requests: int
+    estimated_cost: int
+    request_ids: list[UUID]
+
+
+class ClassificationBatchResponse(BaseModel):
+    batch_id: UUID
+    status: str
+    total_requests: int
+    completed_requests: int
+    failed_requests: int
+    estimated_cost: int
+    final_cost: int
+    request_ids: list[UUID]
+    created_at: datetime
+    completed_at: datetime | None = None
 
 
 def new_request_id() -> UUID:

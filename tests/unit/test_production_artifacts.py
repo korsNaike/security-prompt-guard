@@ -17,6 +17,7 @@ def test_makefile_has_hardening_targets() -> None:
     assert "ci:" in content
     assert "smoke:" in content
     assert "load-test:" in content
+    assert "acceptance:" in content
 
 
 def test_test_compose_defines_postgres_and_redis() -> None:
@@ -37,7 +38,9 @@ def test_runbook_and_security_review_exist() -> None:
 def test_smoke_and_load_scripts_are_environment_configurable() -> None:
     smoke = Path("scripts/smoke_test.py").read_text()
     load = Path("scripts/load_test.py").read_text()
+    acceptance = Path("scripts/acceptance_scenario.py").read_text()
 
     assert "UNICLASSIFY_BASE_URL" in smoke
     assert "LOAD_TEST_REQUESTS" in load
     assert "LOAD_TEST_CONCURRENCY" in load
+    assert "UNICLASSIFY_BASE_URL" in acceptance

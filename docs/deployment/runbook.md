@@ -6,7 +6,7 @@
 2. Start dependencies and services:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 3. Apply migrations from the API container or local environment:
@@ -55,3 +55,13 @@ LOAD_TEST_REQUESTS=100 LOAD_TEST_CONCURRENCY=10 make load-test
 ```
 
 The load script is a lightweight probe, not a full capacity benchmark.
+
+## Acceptance Check
+
+```bash
+docker compose up -d --build
+docker compose exec api uv run alembic upgrade head
+make acceptance
+```
+
+The script registers a temporary user, verifies initial credits, runs preview, async and batch classification, checks metrics and reconciles billing transactions.

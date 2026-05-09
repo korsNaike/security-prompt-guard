@@ -1,6 +1,13 @@
 from fastapi import APIRouter, HTTPException
-
+from app.api.deps import DbSessionDep
+from app.application.models.catalog_service import to_model_info
+from app.core.config import settings
 from app.core.exceptions import ModelNotFoundError
+from app.infrastructure.db.repositories.model_catalog_repository import (
+    ModelCatalogRepository,
+    sync_model_catalog_from_definitions,
+)
+from app.infrastructure.ml.config_loader import load_model_definitions
 from app.infrastructure.ml.loader import model_registry
 from app.schemas.models import ModelInfo, ModelListResponse
 
@@ -21,7 +28,20 @@ def _to_schema(descriptor) -> ModelInfo:
 
 
 @router.get("", summary="List available ML models")
-async def list_models() -> ModelListResponse:
+async def list_models(session: DbSessionDep) -> ModelListResponse:
+    try:
+        repository = ModelCatalogRepository(session)
+        items = await repository.list_models()
+        if not items:
+            await sync_model_catalog_from_definitions(
+                repository,
+                load_model_definitions(settings.model_config_path),
+            )
+            await session.commit()
+            items = await repository.list_models()
+        return ModelListResponse(items=[to_model_info(item) for item in items])
+    except Exception:
+        await session.rollback()
     return ModelListResponse(items=[_to_schema(item) for item in model_registry.list_models()])
 
 

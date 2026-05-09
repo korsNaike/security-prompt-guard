@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.auth.use_cases import AuthService, InactiveUserError, UserNotFoundError
 from app.core.config import settings
 from app.core.security import InvalidTokenError, decode_access_token
+from app.infrastructure.db.repositories.billing_repository import BillingRepository
 from app.infrastructure.db.repositories.user_repository import UserRepository
 from app.infrastructure.db.session import get_db_session
 
@@ -19,6 +20,7 @@ DbSessionDep = Annotated[AsyncSession, Depends(get_db_session)]
 def get_auth_service(session: DbSessionDep) -> AuthService:
     return AuthService(
         repository=UserRepository(session),
+        billing_repository=BillingRepository(session),
         initial_credits=settings.initial_credits,
     )
 

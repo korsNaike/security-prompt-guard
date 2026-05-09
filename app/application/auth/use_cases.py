@@ -29,9 +29,10 @@ class AuthResult:
 
 
 class AuthService:
-    def __init__(self, repository, initial_credits: int) -> None:
+    def __init__(self, repository, initial_credits: int, billing_repository=None) -> None:
         self.repository = repository
         self.initial_credits = initial_credits
+        self.billing_repository = billing_repository
 
     async def register(self, *, email: str, password: str) -> AuthResult:
         existing_user = await self.repository.get_by_email(email)
@@ -43,6 +44,11 @@ class AuthService:
             hashed_password=get_password_hash(password),
             initial_credits=self.initial_credits,
         )
+        if self.billing_repository is not None:
+            await self.billing_repository.create_initial_grant(
+                user_id=user.id,
+                amount=self.initial_credits,
+            )
         return AuthResult(user=user, access_token=create_access_token(str(user.id)))
 
     async def login(self, *, email: str, password: str) -> AuthResult:

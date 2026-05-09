@@ -1,10 +1,13 @@
-.PHONY: install test lint format ci dev smoke load-test acceptance migrate docker-up docker-down docker-logs
+.PHONY: install test lint format ci dev smoke load-test acceptance migrate docker-up docker-down docker-logs coverage
 
 install:
 	uv sync
 
 test:
 	uv run pytest
+
+coverage:
+	uv run pytest --cov=app --cov-fail-under=70
 
 lint:
 	uv run ruff check .

@@ -5,7 +5,6 @@ from urllib.request import Request, urlopen
 
 import streamlit as st
 
-
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
 
 

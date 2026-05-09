@@ -111,7 +111,8 @@ async def test_recalculate_loyalty_tiers_bootstraps_and_updates_user(session_fac
     async with session_factory() as session:
         refreshed = await session.get(UserModel, user.id)
         tier = await session.get(LoyaltyTierModel, refreshed.loyalty_tier_id)
-        history_count = len((await session.execute(select(LoyaltyTierHistoryModel))).scalars().all())
+        history_result = await session.execute(select(LoyaltyTierHistoryModel))
+        history_count = len(history_result.scalars().all())
 
         assert tier.code == "silver"
         assert history_count == 1

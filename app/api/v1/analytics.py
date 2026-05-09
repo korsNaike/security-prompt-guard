@@ -9,8 +9,8 @@ from app.infrastructure.db.repositories.classification_repository import Classif
 from app.schemas.analytics import (
     AnalyticsCostItem,
     AnalyticsCostResponse,
-    AnalyticsModelsResponse,
     AnalyticsModelItem,
+    AnalyticsModelsResponse,
     AnalyticsSummaryResponse,
     AnalyticsUsageItem,
     AnalyticsUsageResponse,

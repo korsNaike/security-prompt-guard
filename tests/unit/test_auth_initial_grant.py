@@ -22,7 +22,7 @@ class FakeUserRepository:
         user = UserModel(id=uuid4(), email=email, hashed_password=hashed_password)
         user.balance = UserBalanceModel(
             user_id=user.id,
-            current_balance=initial_credits,
+            current_balance=0,
             reserved_balance=0,
         )
         self.users_by_email[email] = user
@@ -30,11 +30,15 @@ class FakeUserRepository:
 
 
 class FakeBillingRepository:
-    def __init__(self) -> None:
+    def __init__(self, user_repository: FakeUserRepository) -> None:
+        self.user_repository = user_repository
         self.created_initial_grants: list[tuple[object, int]] = []
 
     async def create_initial_grant(self, *, user_id, amount: int):
         self.created_initial_grants.append((user_id, amount))
+        for user in self.user_repository.users_by_email.values():
+            if user.id == user_id:
+                user.balance.current_balance += amount
         transaction = type("Transaction", (), {})()
         transaction.transaction_type = BillingTransactionType.INITIAL_GRANT.value
         transaction.amount = amount
@@ -43,7 +47,7 @@ class FakeBillingRepository:
 
 async def test_register_creates_initial_grant_transaction() -> None:
     user_repository = FakeUserRepository()
-    billing_repository = FakeBillingRepository()
+    billing_repository = FakeBillingRepository(user_repository)
     service = AuthService(
         repository=user_repository,
         billing_repository=billing_repository,
@@ -53,3 +57,4 @@ async def test_register_creates_initial_grant_transaction() -> None:
     result = await service.register(email="user@example.com", password="strong-password")
 
     assert billing_repository.created_initial_grants == [(result.user.id, 100)]
+    assert result.user.balance.current_balance == 100

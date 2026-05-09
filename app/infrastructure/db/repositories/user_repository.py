@@ -44,7 +44,7 @@ class UserRepository:
         initial_credits: int,
     ) -> UserModel:
         user = UserModel(email=email, hashed_password=hashed_password)
-        user.balance = UserBalanceModel(current_balance=initial_credits, reserved_balance=0)
+        user.balance = UserBalanceModel(current_balance=0, reserved_balance=0)
         self.session.add(user)
         await self.session.flush()
         await self.session.refresh(user, attribute_names=["balance"])

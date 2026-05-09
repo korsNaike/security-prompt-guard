@@ -21,6 +21,7 @@ async def process_classification_request(
     session_factory=AsyncSessionLocal,
     registry=model_registry,
     cache=classification_cache,
+    retry_errors: bool = False,
 ) -> dict:
     parsed_request_id = UUID(request_id)
 
@@ -45,6 +46,7 @@ async def process_classification_request(
 
             classifier = registry.get(request.model_code)
             cached_result = cache.get(
+                user_id=str(request.user_id),
                 model_code=request.model_code,
                 mode=request.mode,
                 model_version=classifier.model_version,
@@ -121,6 +123,7 @@ async def process_classification_request(
             if not cache_hit:
                 cache.set(
                     model_code=request.model_code,
+                    user_id=str(request.user_id),
                     mode=request.mode,
                     model_version=model_version,
                     text=request.input_text,
@@ -150,43 +153,60 @@ async def process_classification_request(
                 "cache_hit": cache_hit,
             }
     except Exception as exc:
-        async with session_factory() as session:
-            repository = ClassificationRepository(session)
-            billing_repository = BillingRepository(session)
-            request = await repository.get_by_id(parsed_request_id)
-            if request is not None and request.status != "completed":
-                hold = await billing_repository.get_transaction_by_idempotency_key(
-                    f"classification:{request.id}:hold"
+        if retry_errors:
+            raise
+        return await mark_classification_failed_after_retries(
+            request_id,
+            str(exc),
+            session_factory=session_factory,
+        )
+
+
+async def mark_classification_failed_after_retries(
+    request_id: str,
+    error_message: str,
+    *,
+    session_factory=AsyncSessionLocal,
+) -> dict:
+    parsed_request_id = UUID(request_id)
+    async with session_factory() as session:
+        repository = ClassificationRepository(session)
+        billing_repository = BillingRepository(session)
+        request = await repository.get_by_id(parsed_request_id)
+        if request is not None and request.status != "completed":
+            hold = await billing_repository.get_transaction_by_idempotency_key(
+                f"classification:{request.id}:hold"
+            )
+            if hold is not None:
+                await billing_repository.refund_reserved_credits(
+                    user_id=request.user_id,
+                    amount=request.estimated_cost,
+                    idempotency_key=f"classification:{request.id}:refund",
+                    related_transaction_id=hold.id,
+                    description=f"Refund failed classification {request.id}",
+                    classification_request_id=request.id,
                 )
-                if hold is not None:
-                    await billing_repository.refund_reserved_credits(
-                        user_id=request.user_id,
-                        amount=request.estimated_cost,
-                        idempotency_key=f"classification:{request.id}:refund",
-                        related_transaction_id=hold.id,
-                        description=f"Refund failed classification {request.id}",
-                        classification_request_id=request.id,
-                    )
-                await repository.mark_failed(request=request, error_message=str(exc))
-                if request.batch_id is not None:
-                    await repository.mark_batch_item_failed(request.id, str(exc))
-                    await repository.update_batch_progress(request.batch_id)
-                await session.commit()
-                metrics_registry.record_worker(
-                    model_code=request.model_code,
-                    status="failed",
-                    cache_hit=False,
-                )
-        return {"request_id": request_id, "status": "failed", "error": str(exc)}
+            await repository.mark_failed(request=request, error_message=error_message)
+            if request.batch_id is not None:
+                await repository.mark_batch_item_failed(request.id, error_message)
+                await repository.update_batch_progress(request.batch_id)
+            await session.commit()
+            metrics_registry.record_worker(
+                model_code=request.model_code,
+                status="failed",
+                cache_hit=False,
+            )
+    return {"request_id": request_id, "status": "failed", "error": error_message}
 
 
 @celery_app.task(
     name="classification.run",
-    autoretry_for=(Exception,),
+    bind=True,
     retry_backoff=True,
     max_retries=3,
 )
 def run_classification_task(
+    self,
     request_id: str,
     model_code: str | None = None,
     mode: str | None = None,
@@ -199,9 +219,25 @@ def run_classification_task(
             return await process_classification_request(
                 request_id,
                 session_factory=session_factory,
+                retry_errors=True,
             )
 
-        return anyio.run(run_with_isolated_task_session, run_with_task_session)
+        try:
+            return anyio.run(run_with_isolated_task_session, run_with_task_session)
+        except Exception as exc:
+            if self.request.retries < self.max_retries:
+                raise self.retry(exc=exc) from exc
+
+            error_message = str(exc)
+
+            async def fail_with_task_session(session_factory):
+                return await mark_classification_failed_after_retries(
+                    request_id,
+                    error_message,
+                    session_factory=session_factory,
+                )
+
+            return anyio.run(run_with_isolated_task_session, fail_with_task_session)
 
     classifier = model_registry.get(model_code)
     output = classifier.predict(ClassificationInput(text=text, model_code=model_code, mode=mode))

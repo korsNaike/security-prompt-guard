@@ -2,16 +2,22 @@
 
 ## 1. Executive Summary
 
-UniClassify Platform is designed as a universal ML classification backend, not a single-model service. The platform core owns users, auth, credits, async requests, history, analytics, monitoring and API contracts. Product ML modules plug in through `BaseClassifier` and `ModelRegistry`.
+SecurePrompt Guard is a production-shaped backend for paid prompt-safety
+classification. The runtime product focuses on one active model,
+`prompt_guard`, while retaining a generic internal classifier contract so the
+service can evolve without rewriting auth, billing, queues, analytics, or
+observability.
 
-The MVP starts with deterministic baseline classifiers to make the repository runnable and testable. Production ML upgrades are isolated inside plugin modules.
+The current scope intentionally excludes TextMood Analytics from runtime,
+catalog, API examples, and acceptance criteria.
 
-## 2. Final Architecture
+## 2. Runtime Architecture
 
-- API: FastAPI.
-- Application: use cases for auth, billing, classifications, model catalog.
-- Domain: users, billing, classifications and ML contracts.
-- Infrastructure: PostgreSQL, Redis, Celery, ML adapters, metrics.
+- API: FastAPI with JWT-protected paid classification endpoints.
+- Application: use cases for auth, billing, classifications, analytics, and
+  model catalog.
+- Domain: users, billing rules, classification entities, and ML contracts.
+- Infrastructure: PostgreSQL, Redis, Celery, cache, model plugins, metrics.
 
 ```mermaid
 flowchart LR
@@ -21,7 +27,7 @@ flowchart LR
     UseCases --> Queue[Celery/Redis]
     Queue --> Worker[Worker]
     Worker --> Registry[Model Registry]
-    Registry --> Plugins[Classifier Plugins]
+    Registry --> PromptGuard[Prompt Guard Classifier]
 ```
 
 ## 3. Selected Technologies
@@ -31,133 +37,57 @@ flowchart LR
 - SQLAlchemy 2.0 async + asyncpg for DB access.
 - Alembic for migrations.
 - Celery + Redis for async inference and periodic jobs.
-- Redis for cache.
+- Per-user inference cache for repeated prompts without cross-user leakage.
 - Prometheus + Grafana for observability.
 - uv for dependency management.
 - pytest/Ruff/pre-commit/GitHub Actions for engineering hygiene.
 
-## 4. Selected ML Models
+## 4. Active ML Model
 
-MVP:
+Runtime model:
 
-- Rule-based `PromptGuardClassifier`.
-- Rule-based `TextMoodClassifier`.
+- `prompt_guard`: Rule-Based Prompt Guard Baseline.
 
-Production candidates:
+Labels:
 
-- SecurePrompt Guard: Llama Prompt Guard 2 22M/86M, ProtectAI DeBERTa, DeBERTa-small prompt injection classifiers, optional Llama Guard/external moderation for advanced mode.
-- TextMood Analytics: DistilBERT/RoBERTa baseline, domain-finetuned encoder classifier, multilingual encoder if Russian/English support is required.
+- `safe`
+- `prompt_injection`
+- `jailbreak`
+- `harmful`
+- `data_exfiltration`
+- `suspicious`
 
-## 5. Dataset Strategy
+Production upgrade candidates include Llama Prompt Guard 2 22M/86M, ProtectAI
+DeBERTa, DeBERTa-small prompt-injection classifiers, and optional external
+moderation adapters for advanced mode.
 
-- Prompt safety: neuralchemy/deepset/HackAPrompt-style prompt injection data, plus safety/toxicity datasets.
-- Toxicity: Jigsaw Toxic Comment.
-- Sentiment: SST-2 and TweetEval.
-- Emotion/anger: GoEmotions and DAIR emotion.
-- Urgency: create product-specific support-ticket dataset because public urgency labels are not cleanly standardized.
-
-## 6. Repository Structure
-
-The repository uses clean boundaries:
-
-- `app/domain/ml` for contracts.
-- `app/infrastructure/ml/<model_code>` for plugins.
-- `app/api/v1` for routers.
-- `config/models.yml` for model metadata/pricing.
-- `docs` for architecture/research decisions.
-- `tests` for deterministic unit and future integration tests.
-
-## 7. Async Flow
-
-API validates model/mode, reserves credits, creates request and enqueues work. Worker loads classifier by `model_code`, runs inference, saves result and captures credits. On failure, worker refunds reserved credits and records failure.
-
-## 8. Billing Flow
+## 5. Billing Flow
 
 Billing uses `reserve -> inference -> capture/refund`.
 
-- Hold is created before enqueue.
-- Capture happens only after successful inference.
-- Refund happens on inference failure.
+- `inference_hold` reserves credits and decreases current balance.
+- `inference_capture` is a neutral settlement record with amount `0`; it moves
+  reserved credits out of `reserved_balance` without double-counting spend.
+- `inference_refund` returns reserved credits after final inference failure.
+- `cache_hit_charge` is used only for same-user cache hits.
 - Idempotency keys prevent duplicate financial operations.
-- Batch requests reserve total cost and settle per item.
 
-## 9. Model Plugin System
+## 6. Async And Retry Flow
 
-Every classifier implements:
+API creates a pending request and enqueues a Celery task. The worker marks the
+request as processing, runs inference through `BaseClassifier`, persists the
+result, and settles billing. Inference errors are re-raised in the Celery path
+so task retries actually execute. After retries are exhausted, the request is
+marked failed and reserved credits are refunded.
 
-- metadata fields;
-- `supported_modes`;
-- `labels`;
-- `predict(ClassificationInput) -> ClassificationOutput`.
+## 7. Acceptance Scope
 
-New products are added by creating a plugin folder, adding config and registering the plugin.
+The current branch is accepted when:
 
-## 10. Deployment Approach
-
-Local production-like deployment uses Docker Compose:
-
-- API
-- worker
-- beat
-- PostgreSQL
-- Redis
-- Prometheus
-- Grafana
-
-Production scaling can split API and worker replicas and move model inference to dedicated CPU/GPU nodes.
-
-## 11. Scalability Strategy
-
-- Scale API horizontally.
-- Scale workers by model queue.
-- Add micro-batching for transformer inference.
-- Use cache keyed by model version.
-- Move large models to ONNX runtime or dedicated inference service.
-
-## 12. Security Considerations
-
-- Never log raw secrets or authorization headers.
-- Hash passwords with a strong password hashing algorithm in Phase 2.
-- JWT secrets must come from environment/secret manager.
-- Admin endpoints require role checks.
-- Billing operations require DB locks and idempotency.
-- Prompt safety models are defense-in-depth, not a complete security boundary.
-
-## 13. Observability
-
-Track API latency, request count, worker task status, inference duration, billing operations, label distribution and model version usage. Grafana dashboards should separate platform health from product analytics.
-
-## 14. Testing Strategy
-
-- Unit tests for registry, classifier contracts and billing math.
-- API tests with httpx.
-- Integration tests with PostgreSQL/Redis for balance locking and Celery boundaries.
-- Contract tests for every new model plugin.
-- CI runs lint and tests.
-
-## 15. Risks
-
-- Public prompt-injection datasets may not generalize to new attacks.
-- Dataset licenses must be checked before redistribution/commercial use.
-- Rule baseline is not production-grade ML quality.
-- Billing idempotency bugs can cause financial inconsistency.
-- Async retries can duplicate effects unless all worker writes are idempotent.
-
-## 16. Future Improvements
-
-- Full auth implementation.
-- Alembic migrations for all tables in the technical task.
-- Real async classification persistence.
-- ONNX model runtime.
-- Streamlit dashboard.
-- Admin model activation/version controls.
-- OpenTelemetry tracing.
-
-## 17. Production Scaling Roadmap
-
-1. Complete DB/auth/billing.
-2. Add real queue-backed classification lifecycle.
-3. Integrate and evaluate production candidate models.
-4. Add model artifact registry and version promotion.
-5. Add load tests and worker autoscaling.
-6. Split model inference into dedicated services if GPU or memory pressure requires it.
+1. `docker compose up` runs migrations and starts the full stack.
+2. `/ready` succeeds only after the database schema exists.
+3. `/api/v1/models` exposes `prompt_guard`.
+4. Paid async classification, batch processing, billing, analytics, metrics,
+   Streamlit, Prometheus, and Grafana work without TextMood runtime support.
+5. Unknown `text_mood` requests are rejected because the model is not
+   registered.

@@ -105,3 +105,33 @@ async def test_worker_refunds_reserved_credits_on_failure(session_factory) -> No
                 f"classification:{request_id}:refund"
             )
         ) is not None
+
+
+async def test_worker_retry_path_raises_before_finalizing_failure(session_factory) -> None:
+    user_id, request_id = await create_reserved_request(session_factory)
+
+    class FailingRegistry:
+        def get(self, model_code: str):
+            raise RuntimeError("model artifact is unavailable")
+
+    with pytest.raises(RuntimeError, match="model artifact is unavailable"):
+        await process_classification_request(
+            str(request_id),
+            session_factory=session_factory,
+            registry=FailingRegistry(),
+            retry_errors=True,
+        )
+
+    async with session_factory() as session:
+        billing_repository = BillingRepository(session)
+        stored = await ClassificationRepository(session).get_by_id(request_id)
+        balance = await billing_repository.get_balance(user_id)
+
+        assert stored.status == ClassificationStatus.PROCESSING.value
+        assert balance.current_balance == 93
+        assert balance.reserved_balance == 7
+        assert (
+            await billing_repository.get_transaction_by_idempotency_key(
+                f"classification:{request_id}:refund"
+            )
+        ) is None

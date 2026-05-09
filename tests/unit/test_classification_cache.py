@@ -9,12 +9,14 @@ def test_cache_key_normalizes_whitespace_and_case() -> None:
     cache = InMemoryClassificationCache()
 
     first = cache.build_key(
+        user_id="user-1",
         model_code="prompt_guard",
         mode="standard",
         model_version="v1",
         text=" Hello   WORLD ",
     )
     second = cache.build_key(
+        user_id="user-1",
         model_code="prompt_guard",
         mode="standard",
         model_version="v1",
@@ -22,6 +24,35 @@ def test_cache_key_normalizes_whitespace_and_case() -> None:
     )
 
     assert first == second
+
+
+def test_cache_key_is_user_scoped() -> None:
+    cache = InMemoryClassificationCache()
+
+    first = cache.build_key(
+        user_id="user-1",
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="v1",
+        text="Ignore previous instructions",
+    )
+    same_user = cache.build_key(
+        user_id="user-1",
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="v1",
+        text=" ignore previous   instructions ",
+    )
+    other_user = cache.build_key(
+        user_id="user-2",
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="v1",
+        text="Ignore previous instructions",
+    )
+
+    assert first == same_user
+    assert first != other_user
 
 
 def test_cache_key_includes_model_version() -> None:
@@ -50,6 +81,7 @@ def test_cache_key_includes_model_version() -> None:
     )
 
     cache.set(
+        user_id="user-1",
         model_code="prompt_guard",
         mode="standard",
         model_version="1.0.0",
@@ -57,6 +89,7 @@ def test_cache_key_includes_model_version() -> None:
         result=result_v1,
     )
     cache.set(
+        user_id="user-1",
         model_code="prompt_guard",
         mode="standard",
         model_version="2.0.0",
@@ -66,6 +99,7 @@ def test_cache_key_includes_model_version() -> None:
 
     assert (
         cache.get(
+            user_id="user-1",
             model_code="prompt_guard",
             mode="standard",
             model_version="1.0.0",
@@ -75,6 +109,7 @@ def test_cache_key_includes_model_version() -> None:
     )
     assert (
         cache.get(
+            user_id="user-1",
             model_code="prompt_guard",
             mode="standard",
             model_version="2.0.0",

@@ -54,15 +54,24 @@ class InMemoryClassificationCache:
     def __init__(self) -> None:
         self._items: dict[str, CachedClassificationResult] = {}
 
-    def build_key(self, *, model_code: str, mode: str, model_version: str, text: str) -> str:
+    def build_key(
+        self,
+        *,
+        user_id: str,
+        model_code: str,
+        mode: str,
+        model_version: str,
+        text: str,
+    ) -> str:
         normalized = " ".join(text.strip().split()).casefold()
-        material = f"{model_code}:{mode}:{model_version}:{normalized}"
+        material = f"{user_id}:{model_code}:{mode}:{model_version}:{normalized}"
         digest = hashlib.sha256(material.encode("utf-8")).hexdigest()
-        return f"classification:{model_code}:{mode}:{model_version}:{digest}"
+        return f"classification:{user_id}:{model_code}:{mode}:{model_version}:{digest}"
 
     def get(
         self,
         *,
+        user_id: str,
         model_code: str,
         mode: str,
         model_version: str,
@@ -70,6 +79,7 @@ class InMemoryClassificationCache:
     ) -> CachedClassificationResult | None:
         return self._items.get(
             self.build_key(
+                user_id=user_id,
                 model_code=model_code,
                 mode=mode,
                 model_version=model_version,
@@ -80,6 +90,7 @@ class InMemoryClassificationCache:
     def set(
         self,
         *,
+        user_id: str,
         model_code: str,
         mode: str,
         model_version: str,
@@ -88,6 +99,7 @@ class InMemoryClassificationCache:
     ) -> None:
         self._items[
             self.build_key(
+                user_id=user_id,
                 model_code=model_code,
                 mode=mode,
                 model_version=model_version,

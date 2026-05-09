@@ -124,6 +124,7 @@ async def test_reserve_capture_and_refund_are_idempotent(session_factory) -> Non
 
         assert hold.id == duplicate_hold.id
         assert capture.id == duplicate_capture.id
+        assert capture.amount == 0
         assert current_after_hold == 80
         assert reserved_after_hold == 20
         assert balance_after_capture.current_balance == 80

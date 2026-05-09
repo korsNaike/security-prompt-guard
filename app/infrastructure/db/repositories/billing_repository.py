@@ -291,7 +291,7 @@ class BillingRepository:
 
         return await self._create_transaction(
             user_id=user_id,
-            amount=-amount,
+            amount=0,
             transaction_type=BillingTransactionType.INFERENCE_CAPTURE,
             idempotency_key=idempotency_key,
             description=description,

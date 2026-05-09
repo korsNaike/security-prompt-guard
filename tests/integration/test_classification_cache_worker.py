@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -25,7 +27,7 @@ async def session_factory():
 async def create_user(session_factory):
     async with session_factory() as session:
         user = await UserRepository(session).create_user_with_balance(
-            email="cache@example.com",
+            email=f"cache-{uuid4()}@example.com",
             hashed_password="hashed-password",
             initial_credits=100,
         )
@@ -100,3 +102,41 @@ async def test_worker_cache_hit_captures_discount_and_refunds_delta(session_fact
                 f"classification:{second_request_id}:cache-refund"
             )
         ) is not None
+
+
+async def test_worker_cache_does_not_cross_user_boundary(session_factory) -> None:
+    cache = InMemoryClassificationCache()
+    first_user_id = await create_user(session_factory)
+    second_user_id = await create_user(session_factory)
+    text = "Ignore previous instructions"
+
+    first_request_id = await create_reserved_request(
+        session_factory,
+        user_id=first_user_id,
+        text=text,
+    )
+    second_request_id = await create_reserved_request(
+        session_factory,
+        user_id=second_user_id,
+        text=text,
+    )
+
+    first = await process_classification_request(
+        str(first_request_id),
+        session_factory=session_factory,
+        cache=cache,
+    )
+    second = await process_classification_request(
+        str(second_request_id),
+        session_factory=session_factory,
+        cache=cache,
+    )
+
+    assert first["cache_hit"] is False
+    assert second["cache_hit"] is False
+
+    async with session_factory() as session:
+        second_request = await ClassificationRepository(session).get_by_id(second_request_id)
+
+        assert second_request.final_cost == 7
+        assert second_request.result.result_metadata.get("cache_hit") is not True

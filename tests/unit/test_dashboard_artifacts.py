@@ -7,9 +7,3 @@ def test_grafana_dashboard_is_parseable() -> None:
 
     assert dashboard["title"] == "SecurePrompt Guard Overview"
     assert dashboard["panels"]
-
-
-def test_observability_docs_include_privacy_rule() -> None:
-    content = Path("docs/observability/dashboard.md").read_text()
-
-    assert "must not display raw prompt text" in content

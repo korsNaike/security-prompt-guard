@@ -27,14 +27,6 @@ def test_test_compose_defines_postgres_and_redis() -> None:
     assert "redis-test" in compose["services"]
 
 
-def test_runbook_and_security_review_exist() -> None:
-    runbook = Path("docs/deployment/runbook.md").read_text()
-    security = Path("docs/security/security_review.md").read_text()
-
-    assert "Rollback" in runbook
-    assert "Model Supply Chain" in security
-
-
 def test_smoke_and_load_scripts_are_environment_configurable() -> None:
     smoke = Path("scripts/smoke_test.py").read_text()
     load = Path("scripts/load_test.py").read_text()

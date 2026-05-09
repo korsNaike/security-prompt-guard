@@ -31,6 +31,7 @@ async def process_classification_request(
         if request.status in {"completed", "failed", "cancelled"}:
             return {"request_id": request_id, "status": request.status}
         await repository.mark_processing(request)
+        await repository.mark_batch_item_processing(request.id)
         await session.commit()
 
     try:
@@ -102,6 +103,7 @@ async def process_classification_request(
                     classification_request_id=request.id,
                 )
             if request.batch_id is not None:
+                await repository.mark_batch_item_completed(request.id)
                 await repository.update_batch_progress(request.batch_id)
             await session.commit()
             if not cache_hit:
@@ -154,6 +156,7 @@ async def process_classification_request(
                     )
                 await repository.mark_failed(request=request, error_message=str(exc))
                 if request.batch_id is not None:
+                    await repository.mark_batch_item_failed(request.id, str(exc))
                     await repository.update_batch_progress(request.batch_id)
                 await session.commit()
                 metrics_registry.record_worker(

@@ -84,7 +84,7 @@ class ClassificationService:
             estimated_cost=estimated_cost_per_item * len(items),
         )
         requests = []
-        for text in items:
+        for item_index, text in enumerate(items):
             request = await self.repository.create_request(
                 user_id=user_id,
                 batch_id=batch.id,
@@ -92,6 +92,11 @@ class ClassificationService:
                 mode=mode,
                 input_text=text,
                 estimated_cost=estimated_cost_per_item,
+            )
+            await self.repository.create_batch_item(
+                batch_id=batch.id,
+                classification_request_id=request.id,
+                item_index=item_index,
             )
             await self.billing_repository.reserve_credits(
                 user_id=user_id,

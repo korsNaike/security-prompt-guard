@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.domain.classifications.entities import ClassificationStatus
 from app.domain.ml.classifier_contracts import ClassificationOutput
 from app.infrastructure.db.models import (
+    ClassificationBatchItemModel,
     ClassificationBatchModel,
     ClassificationRequestModel,
     ClassificationResultModel,
@@ -59,6 +60,34 @@ class ClassificationRepository:
         self.session.add(batch)
         await self.session.flush()
         return batch
+
+    async def create_batch_item(
+        self,
+        *,
+        batch_id: UUID,
+        classification_request_id: UUID,
+        item_index: int,
+    ) -> ClassificationBatchItemModel:
+        item = ClassificationBatchItemModel(
+            batch_id=batch_id,
+            classification_request_id=classification_request_id,
+            item_index=item_index,
+            status=ClassificationStatus.PENDING.value,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        return item
+
+    async def get_batch_item_by_request_id(
+        self,
+        request_id: UUID,
+    ) -> ClassificationBatchItemModel | None:
+        result = await self.session.execute(
+            select(ClassificationBatchItemModel).where(
+                ClassificationBatchItemModel.classification_request_id == request_id
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def get_by_id(self, request_id: UUID) -> ClassificationRequestModel | None:
         result = await self.session.execute(
@@ -174,6 +203,28 @@ class ClassificationRepository:
         request.error_message = None
         await self.session.flush()
         return request
+
+    async def mark_batch_item_processing(self, request_id: UUID) -> None:
+        item = await self.get_batch_item_by_request_id(request_id)
+        if item is not None:
+            item.status = ClassificationStatus.PROCESSING.value
+            await self.session.flush()
+
+    async def mark_batch_item_completed(self, request_id: UUID) -> None:
+        item = await self.get_batch_item_by_request_id(request_id)
+        if item is not None:
+            item.status = ClassificationStatus.COMPLETED.value
+            item.completed_at = datetime.now(UTC)
+            item.error_message = None
+            await self.session.flush()
+
+    async def mark_batch_item_failed(self, request_id: UUID, error_message: str) -> None:
+        item = await self.get_batch_item_by_request_id(request_id)
+        if item is not None:
+            item.status = ClassificationStatus.FAILED.value
+            item.completed_at = datetime.now(UTC)
+            item.error_message = error_message[:4000]
+            await self.session.flush()
 
     async def save_success(
         self,

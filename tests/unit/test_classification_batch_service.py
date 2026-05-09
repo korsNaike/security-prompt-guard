@@ -42,6 +42,9 @@ class FakeRepository:
         self.requests.append((request, kwargs))
         return request
 
+    async def create_batch_item(self, **kwargs):
+        return type("BatchItem", (), kwargs)()
+
     async def set_celery_task_id(self, *, request_id, celery_task_id: str) -> None:
         return None
 

@@ -32,6 +32,7 @@ async def create_reserved_request(session_factory, *, text: str = "Ignore previo
             hashed_password="hashed-password",
             initial_credits=100,
         )
+        await BillingRepository(session).create_initial_grant(user_id=user.id, amount=100)
         classification_repository = ClassificationRepository(session)
         request = await classification_repository.create_request(
             user_id=user.id,

@@ -1,12 +1,12 @@
+from app.core.config import settings
 from app.domain.ml.model_registry import ModelRegistry
-from app.infrastructure.ml.prompt_guard.classifier import PromptGuardClassifier
-from app.infrastructure.ml.text_mood.classifier import TextMoodClassifier
+from app.infrastructure.ml.config_loader import instantiate_classifier, load_model_definitions
 
 
-def build_model_registry() -> ModelRegistry:
+def build_model_registry(config_path: str | None = None) -> ModelRegistry:
     registry = ModelRegistry()
-    registry.register(PromptGuardClassifier(), {"basic": 3, "standard": 7, "advanced": 15})
-    registry.register(TextMoodClassifier(), {"basic": 2, "standard": 5})
+    for definition in load_model_definitions(config_path or settings.model_config_path):
+        registry.register(instantiate_classifier(definition.model_class), definition.pricing)
     return registry
 
 

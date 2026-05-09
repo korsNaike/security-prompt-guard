@@ -196,6 +196,11 @@ class ClassificationBatchModel(Base):
         back_populates="batch",
         lazy="selectin",
     )
+    items: Mapped[list["ClassificationBatchItemModel"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -303,6 +308,123 @@ class ClassificationResultModel(Base):
             self.id = uuid.uuid4()
         if self.created_at is None:
             self.created_at = utc_now()
+
+
+class ClassificationBatchItemModel(Base):
+    __tablename__ = "classification_batch_items"
+    __table_args__ = (
+        UniqueConstraint("batch_id", "item_index", name="uq_classification_batch_items_index"),
+        UniqueConstraint(
+            "classification_request_id",
+            name="uq_classification_batch_items_request",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("classification_batches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    classification_request_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("classification_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default=ClassificationStatus.PENDING.value,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    batch: Mapped[ClassificationBatchModel] = relationship(back_populates="items", lazy="selectin")
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
+        if self.status is None:
+            self.status = ClassificationStatus.PENDING.value
+        if self.created_at is None:
+            self.created_at = utc_now()
+
+
+class MLModelModel(Base):
+    __tablename__ = "ml_models"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    task_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    labels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    pricing: Mapped[list["ModelPricingModel"]] = relationship(
+        back_populates="model",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
+        if self.is_active is None:
+            self.is_active = True
+        if self.created_at is None:
+            self.created_at = utc_now()
+        if self.updated_at is None:
+            self.updated_at = utc_now()
+
+
+class ModelPricingModel(Base):
+    __tablename__ = "model_pricing"
+    __table_args__ = (UniqueConstraint("model_code", "mode", name="uq_model_pricing_model_mode"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_code: Mapped[str] = mapped_column(
+        String(100),
+        ForeignKey("ml_models.model_code", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    cost: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    model: Mapped[MLModelModel] = relationship(back_populates="pricing", lazy="selectin")
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
+        if self.is_active is None:
+            self.is_active = True
+        if self.created_at is None:
+            self.created_at = utc_now()
+        if self.updated_at is None:
+            self.updated_at = utc_now()
 
 
 class PromoCodeModel(Base):

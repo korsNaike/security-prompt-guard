@@ -18,7 +18,7 @@ async def session_factory():
         await engine.dispose()
 
 
-async def test_create_user_with_initial_balance(session_factory) -> None:
+async def test_create_user_with_zero_balance_before_billing_grant(session_factory) -> None:
     async with session_factory() as session:
         repository = UserRepository(session)
 
@@ -30,7 +30,7 @@ async def test_create_user_with_initial_balance(session_factory) -> None:
         await session.commit()
 
         assert user.email == "user@example.com"
-        assert user.balance.current_balance == 100
+        assert user.balance.current_balance == 0
         assert user.balance.reserved_balance == 0
 
 

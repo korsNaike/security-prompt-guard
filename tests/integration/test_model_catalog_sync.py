@@ -34,6 +34,7 @@ async def test_sync_model_catalog_from_default_config(session_factory) -> None:
         items = await ModelCatalogRepository(session).list_models()
 
         assert {item.model_code for item in items} == {"prompt_guard"}
+        assert items[0].model_name == "Rule-Based Prompt Guard Baseline"
 
 
 async def test_sync_model_catalog_deactivates_models_missing_from_config(session_factory) -> None:

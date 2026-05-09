@@ -1,7 +1,8 @@
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import PlainTextResponse
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -14,7 +15,10 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
-        description="Universal ML classification service platform.",
+        description=(
+            "SecurePrompt Guard API for prompt injection, jailbreak, harmful prompt, "
+            "and data exfiltration classification."
+        ),
         docs_url="/docs",
         openapi_url="/openapi.json",
     )
@@ -37,6 +41,18 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"], summary="Service health check")
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": settings.app_name}
+
+    @app.get("/ready", tags=["health"], summary="Service readiness check")
+    async def ready() -> dict[str, str]:
+        try:
+            async with AsyncSessionLocal() as session:
+                await session.execute(text("SELECT 1"))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="database unavailable",
+            ) from exc
+        return {"status": "ready", "service": settings.app_name}
 
     @app.get("/metrics", tags=["monitoring"], summary="Prometheus metrics")
     async def metrics() -> PlainTextResponse:

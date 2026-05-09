@@ -16,6 +16,7 @@ class ModelDefinition:
     model_code: str
     product_name: str
     model_class: str
+    model_name: str
     version: str
     task_type: str
     labels: list[str]
@@ -64,6 +65,7 @@ def load_model_definitions(path: str | Path) -> list[ModelDefinition]:
                     model_code=str(model_code),
                     product_name=str(payload["product_name"]),
                     model_class=str(payload["model_class"]),
+                    model_name=str(payload["model_name"]),
                     version=str(payload["version"]),
                     task_type=str(payload["task_type"]),
                     labels=[str(label) for label in labels],

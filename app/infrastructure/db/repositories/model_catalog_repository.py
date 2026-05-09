@@ -99,7 +99,7 @@ async def sync_model_catalog_from_definitions(
         await repository.upsert_model(
             model_code=definition.model_code,
             product_name=definition.product_name,
-            model_name=definition.model_class.rsplit(".", 1)[-1],
+            model_name=definition.model_name,
             model_version=definition.version,
             task_type=definition.task_type,
             labels=definition.labels,

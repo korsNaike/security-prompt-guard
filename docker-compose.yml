@@ -15,7 +15,7 @@ services:
         - CMD-SHELL
         - >-
           python -c "from urllib.request import urlopen;
-          urlopen('http://127.0.0.1:8000/health', timeout=2)"
+          urlopen('http://127.0.0.1:8000/ready', timeout=2)"
       interval: 10s
       timeout: 5s
       retries: 10

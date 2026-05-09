@@ -13,6 +13,7 @@ models:
   prompt_guard:
     product_name: SecurePrompt Guard
     model_class: app.infrastructure.ml.prompt_guard.classifier.PromptGuardClassifier
+    model_name: Rule-Based Prompt Guard Baseline
     version: 0.1.0
     task_type: prompt_security_classification
     modes:
@@ -25,6 +26,7 @@ models:
     definitions = load_model_definitions(config)
 
     assert definitions[0].model_code == "prompt_guard"
+    assert definitions[0].model_name == "Rule-Based Prompt Guard Baseline"
     assert definitions[0].pricing == {"standard": 7}
 
 

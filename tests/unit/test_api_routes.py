@@ -12,6 +12,16 @@ def test_health_endpoint() -> None:
     assert response.json() == {"status": "ok", "service": "SecurePrompt Guard"}
 
 
+def test_openapi_description_is_product_specific() -> None:
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    assert response.json()["info"]["description"] == (
+        "SecurePrompt Guard API for prompt injection, jailbreak, harmful prompt, "
+        "and data exfiltration classification."
+    )
+
+
 def test_models_endpoint_lists_plugins() -> None:
     response = client.get("/api/v1/models")
 

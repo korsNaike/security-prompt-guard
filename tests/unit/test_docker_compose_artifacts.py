@@ -26,8 +26,19 @@ def test_services_have_healthchecks_and_healthy_dependencies() -> None:
     assert "healthcheck" in compose["services"]["postgres"]
     assert "healthcheck" in compose["services"]["redis"]
     assert "healthcheck" in compose["services"]["api"]
+    assert "/ready" in compose["services"]["api"]["healthcheck"]["test"][-1]
     assert compose["services"]["api"]["depends_on"]["postgres"]["condition"] == "service_healthy"
     assert compose["services"]["worker"]["depends_on"]["api"]["condition"] == "service_healthy"
+
+
+def test_env_example_matches_compose_database_credentials() -> None:
+    content = Path(".env.example").read_text()
+
+    assert "APP_NAME=SecurePrompt Guard" in content
+    assert (
+        "DATABASE_URL=postgresql+asyncpg://"
+        "secure_prompt_guard:secure_prompt_guard@postgres:5432/secure_prompt_guard"
+    ) in content
 
 
 def test_override_preserves_container_virtualenv() -> None:

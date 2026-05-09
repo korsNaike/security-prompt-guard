@@ -1,0 +1,20 @@
+services:
+  api:
+    volumes:
+      - .:/app
+      - api_venv:/app/.venv
+
+  worker:
+    volumes:
+      - .:/app
+      - worker_venv:/app/.venv
+
+  beat:
+    volumes:
+      - .:/app
+      - beat_venv:/app/.venv
+
+volumes:
+  api_venv:
+  worker_venv:
+  beat_venv:

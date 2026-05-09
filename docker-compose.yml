@@ -1,34 +1,46 @@
 services:
   api:
     build: .
-    command: uv run fastapi dev app/main.py --host 0.0.0.0 --port 8000
+    command: uv run python -m fastapi run app/main.py --host 0.0.0.0 --port 8000
     env_file: .env.example
     ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
+      - "${API_PORT:-8000}:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "from urllib.request import urlopen;
+          urlopen('http://127.0.0.1:8000/health', timeout=2)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   worker:
     build: .
-    command: uv run celery -A app.infrastructure.tasks.celery_app.celery_app worker --loglevel=INFO
+    command: uv run python -m celery -A app.infrastructure.tasks.celery_app.celery_app worker --loglevel=INFO
     env_file: .env.example
-    volumes:
-      - .:/app
     depends_on:
-      - postgres
-      - redis
+      api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   beat:
     build: .
-    command: uv run celery -A app.infrastructure.tasks.celery_app.celery_app beat --loglevel=INFO
+    command: uv run python -m celery -A app.infrastructure.tasks.celery_app.celery_app beat --loglevel=INFO
     env_file: .env.example
-    volumes:
-      - .:/app
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
@@ -37,26 +49,39 @@ services:
       POSTGRES_USER: uniclassify
       POSTGRES_PASSWORD: uniclassify
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uniclassify -d uniclassify"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   prometheus:
     image: prom/prometheus:v2.54.1
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      api:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:11.2.0
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
 

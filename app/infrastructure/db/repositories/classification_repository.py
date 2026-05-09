@@ -2,7 +2,7 @@ import hashlib
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -296,3 +296,65 @@ class ClassificationRepository:
     def calculate_input_hash(input_text: str) -> str:
         normalized = " ".join(input_text.strip().split()).casefold()
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    async def get_user_analytics_summary(self, user_id: UUID) -> dict:
+        result = await self.session.execute(
+            select(
+                func.count(ClassificationRequestModel.id),
+                func.coalesce(func.sum(ClassificationRequestModel.estimated_cost), 0),
+                func.coalesce(func.sum(ClassificationRequestModel.final_cost), 0),
+            ).where(ClassificationRequestModel.user_id == user_id)
+        )
+        total_requests, total_estimated_cost, total_final_cost = result.one()
+
+        status_result = await self.session.execute(
+            select(ClassificationRequestModel.status, func.count(ClassificationRequestModel.id))
+            .where(ClassificationRequestModel.user_id == user_id)
+            .group_by(ClassificationRequestModel.status)
+        )
+        status_counts = {status: int(count) for status, count in status_result.all()}
+
+        result_rows = await self.session.execute(
+            select(ClassificationResultModel.result_metadata)
+            .join(ClassificationRequestModel)
+            .where(ClassificationRequestModel.user_id == user_id)
+        )
+        cache_hits = sum(
+            1
+            for (metadata,) in result_rows.all()
+            if isinstance(metadata, dict) and metadata.get("cache_hit") is True
+        )
+
+        return {
+            "total_requests": int(total_requests),
+            "completed_requests": status_counts.get(ClassificationStatus.COMPLETED.value, 0),
+            "failed_requests": status_counts.get(ClassificationStatus.FAILED.value, 0),
+            "total_estimated_cost": int(total_estimated_cost or 0),
+            "total_final_cost": int(total_final_cost or 0),
+            "cache_hits": cache_hits,
+        }
+
+    async def get_user_usage_breakdown(self, user_id: UUID) -> list[dict]:
+        result = await self.session.execute(
+            select(ClassificationRequestModel.status, func.count(ClassificationRequestModel.id))
+            .where(ClassificationRequestModel.user_id == user_id)
+            .group_by(ClassificationRequestModel.status)
+            .order_by(ClassificationRequestModel.status)
+        )
+        return [{"status": status, "count": int(count)} for status, count in result.all()]
+
+    async def get_user_model_breakdown(self, user_id: UUID) -> list[dict]:
+        result = await self.session.execute(
+            select(
+                ClassificationRequestModel.model_code,
+                func.count(ClassificationRequestModel.id),
+                func.coalesce(func.sum(ClassificationRequestModel.final_cost), 0),
+            )
+            .where(ClassificationRequestModel.user_id == user_id)
+            .group_by(ClassificationRequestModel.model_code)
+            .order_by(ClassificationRequestModel.model_code)
+        )
+        return [
+            {"model_code": model_code, "count": int(count), "final_cost": int(final_cost or 0)}
+            for model_code, count, final_cost in result.all()
+        ]

@@ -76,6 +76,26 @@ class BillingRepository:
         )
         return list(result.scalars().all())
 
+    async def get_user_cost_breakdown(self, user_id: UUID) -> list[dict]:
+        result = await self.session.execute(
+            select(
+                BillingTransactionModel.transaction_type,
+                func.coalesce(func.sum(BillingTransactionModel.amount), 0),
+                func.count(BillingTransactionModel.id),
+            )
+            .where(BillingTransactionModel.user_id == user_id)
+            .group_by(BillingTransactionModel.transaction_type)
+            .order_by(BillingTransactionModel.transaction_type)
+        )
+        return [
+            {
+                "transaction_type": transaction_type,
+                "amount": int(amount or 0),
+                "count": int(count),
+            }
+            for transaction_type, amount, count in result.all()
+        ]
+
     async def get_loyalty_tier(self, user_id: UUID) -> LoyaltyTierModel | None:
         result = await self.session.execute(select(UserModel).where(UserModel.id == user_id))
         user = result.scalar_one_or_none()

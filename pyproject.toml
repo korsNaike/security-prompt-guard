@@ -1,7 +1,7 @@
 [project]
 name = "secure-prompt-guard"
 version = "0.1.0"
-description = "Universal ML classification platform foundation for prompt safety and text mood analytics."
+description = "SecurePrompt Guard backend for prompt injection, jailbreak, harmful prompt, and data exfiltration classification."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

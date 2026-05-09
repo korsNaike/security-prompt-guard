@@ -1,1 +1,1 @@
-"""Opt-in Hugging Face prompt safety plugin."""
+"""Opt-in Hugging Face prompt guard plugin."""

@@ -12,14 +12,3 @@ models:
       advanced:
         cost: 15
     labels: [safe, prompt_injection, jailbreak, harmful, data_exfiltration, suspicious]
-  text_mood:
-    product_name: TextMood Analytics
-    model_class: app.infrastructure.ml.text_mood.classifier.TextMoodClassifier
-    version: 0.1.0
-    task_type: sentiment_style_classification
-    modes:
-      basic:
-        cost: 2
-      standard:
-        cost: 5
-    labels: [positive, neutral, negative, angry, urgent, toxic]

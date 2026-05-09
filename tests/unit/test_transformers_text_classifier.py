@@ -24,10 +24,10 @@ def test_transformers_adapter_maps_top_pipeline_label() -> None:
             model_name="Test Model",
             model_id_or_path="local-model",
             model_version="v1",
-            task_type="sentiment",
+            task_type="prompt_security_classification",
             supported_modes=["standard"],
-            labels=["negative", "positive"],
-            label_mapping={"LABEL_0": "negative", "LABEL_1": "positive"},
+            labels=["safe", "prompt_injection"],
+            label_mapping={"LABEL_0": "safe", "LABEL_1": "prompt_injection"},
             default_risk_level="low",
             default_recommended_action="allow",
         ),
@@ -38,7 +38,7 @@ def test_transformers_adapter_maps_top_pipeline_label() -> None:
         ClassificationInput(text="hello", model_code="hf_test", mode="standard")
     )
 
-    assert output.label == "positive"
+    assert output.label == "prompt_injection"
     assert output.confidence == 0.8
     assert output.metadata["source_label"] == "LABEL_1"
 
@@ -50,10 +50,10 @@ def test_artifact_validation_rejects_missing_labels() -> None:
         model_name="Test Model",
         model_id_or_path="local-model",
         model_version="v1",
-        task_type="sentiment",
+        task_type="prompt_security_classification",
         supported_modes=["standard"],
         labels=[],
-        label_mapping={"LABEL_0": "negative"},
+        label_mapping={"LABEL_0": "safe"},
     )
 
     with pytest.raises(ValueError, match="labels"):

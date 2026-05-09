@@ -9,14 +9,14 @@ def test_registry_lists_configured_models() -> None:
 
     model_codes = {model.model_code for model in registry.list_models()}
 
-    assert model_codes == {"prompt_guard", "text_mood"}
+    assert model_codes == {"prompt_guard"}
 
 
 def test_registry_returns_pricing_by_mode() -> None:
     registry = build_model_registry()
 
     assert registry.get_cost("prompt_guard", "standard") == 7
-    assert registry.get_cost("text_mood", "basic") == 2
+    assert registry.get_cost("prompt_guard", "basic") == 3
 
 
 def test_registry_rejects_unknown_model() -> None:
@@ -30,4 +30,4 @@ def test_registry_rejects_unsupported_mode() -> None:
     registry = build_model_registry()
 
     with pytest.raises(UnsupportedModeError):
-        registry.get_cost("text_mood", "advanced")
+        registry.get_cost("prompt_guard", "enterprise")

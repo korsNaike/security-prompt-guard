@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+
 from app.api.deps import DbSessionDep
 from app.application.models.catalog_service import to_model_info
 from app.core.config import settings

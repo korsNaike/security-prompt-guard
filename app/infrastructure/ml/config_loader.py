@@ -71,7 +71,10 @@ def load_model_definitions(path: str | Path) -> list[ModelDefinition]:
                 )
             )
         except KeyError as exc:
-            raise ModelConfigError(f"Model `{model_code}` is missing field `{exc.args[0]}`") from exc
+            missing_field = exc.args[0]
+            raise ModelConfigError(
+                f"Model `{model_code}` is missing field `{missing_field}`"
+            ) from exc
 
     return definitions
 

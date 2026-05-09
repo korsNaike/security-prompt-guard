@@ -315,8 +315,6 @@ make load-test
 
 ![Prometheus targets](images-demo/05-prometheus-targets.png)
 
-![Prometheus worker metrics query](images-demo/06-prometheus-worker-query.png)
-
 ![API metrics endpoint](images-demo/07-api-metrics-endpoint.png)
 
 ![Grafana dashboard](images-demo/08-grafana-dashboard.png)

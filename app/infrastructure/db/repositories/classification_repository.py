@@ -269,6 +269,22 @@ class ClassificationRepository:
         await self.session.flush()
         return request
 
+    async def mark_stale_processing_failed(self, *, older_than: datetime) -> int:
+        result = await self.session.execute(
+            select(ClassificationRequestModel).where(
+                ClassificationRequestModel.status == ClassificationStatus.PROCESSING.value,
+                ClassificationRequestModel.started_at < older_than,
+            )
+        )
+        requests = list(result.scalars().all())
+        for request in requests:
+            request.status = ClassificationStatus.FAILED.value
+            request.completed_at = datetime.now(UTC)
+            request.error_message = "Classification request expired during processing"
+            await self.mark_batch_item_failed(request.id, request.error_message)
+        await self.session.flush()
+        return len(requests)
+
     @staticmethod
     def calculate_input_hash(input_text: str) -> str:
         normalized = " ".join(input_text.strip().split()).casefold()

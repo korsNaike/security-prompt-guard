@@ -243,6 +243,21 @@ class BillingRepository:
         await self.session.flush()
         return promo_code
 
+    async def deactivate_expired_promo_codes(self, *, now: datetime | None = None) -> int:
+        current_time = now or datetime.now(UTC)
+        result = await self.session.execute(
+            select(PromoCodeModel).where(
+                PromoCodeModel.is_active.is_(True),
+                PromoCodeModel.valid_until.is_not(None),
+                PromoCodeModel.valid_until < current_time,
+            )
+        )
+        promo_codes = list(result.scalars().all())
+        for promo_code in promo_codes:
+            promo_code.is_active = False
+        await self.session.flush()
+        return len(promo_codes)
+
     async def _add_positive_balance_transaction(
         self,
         *,

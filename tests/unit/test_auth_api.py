@@ -3,10 +3,11 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_auth_service, get_current_user
+from app.api.deps import get_audit_log_repository, get_auth_service, get_current_user
 from app.application.auth.use_cases import AuthResult
 from app.infrastructure.db.models import UserBalanceModel, UserModel
 from app.main import app
+from tests.unit.fakes import FakeAuditLogRepository
 
 
 class FakeAuthService:
@@ -36,6 +37,7 @@ def client() -> TestClient:
     service = FakeAuthService()
     app.dependency_overrides[get_auth_service] = lambda: service
     app.dependency_overrides[get_current_user] = lambda: service.user
+    app.dependency_overrides[get_audit_log_repository] = lambda: FakeAuditLogRepository()
     try:
         yield TestClient(app)
     finally:
@@ -75,3 +77,13 @@ def test_me_endpoint_returns_current_user(client: TestClient) -> None:
     payload = response.json()
     assert payload["email"] == "user@example.com"
     assert payload["balance"]["current_balance"] == 100
+
+
+def test_refresh_endpoint_returns_new_access_token(client: TestClient) -> None:
+    response = client.post("/api/v1/auth/refresh")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["token_type"] == "bearer"
+    assert payload["access_token"]
+    assert payload["user"]["email"] == "user@example.com"

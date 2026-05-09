@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.deps import CurrentUserDep, DbSessionDep
+from app.api.deps import AuditLogRepositoryDep, CurrentUserDep, DbSessionDep
 from app.application.classifications.use_cases import (
     ClassificationBatchNotFoundError,
     ClassificationBatchSizeError,
@@ -115,6 +115,7 @@ async def create_classification(
     payload: ClassificationCreateRequest,
     current_user: CurrentUserDep,
     classification_service: ClassificationServiceDep,
+    audit_log_repository: AuditLogRepositoryDep,
     session: DbSessionDep,
 ) -> ClassificationCreateResponse:
     try:
@@ -123,6 +124,17 @@ async def create_classification(
             model_code=payload.model_code,
             mode=payload.mode,
             text=payload.text,
+        )
+        await audit_log_repository.record(
+            actor_user_id=current_user.id,
+            action="classification.create",
+            entity_type="classification_request",
+            entity_id=request.id,
+            metadata={
+                "model_code": request.model_code,
+                "mode": request.mode,
+                "estimated_cost": request.estimated_cost,
+            },
         )
         await session.commit()
     except ModelNotFoundError as exc:
@@ -149,6 +161,7 @@ async def create_classification_batch(
     payload: ClassificationBatchCreateRequest,
     current_user: CurrentUserDep,
     classification_service: ClassificationServiceDep,
+    audit_log_repository: AuditLogRepositoryDep,
     session: DbSessionDep,
 ) -> ClassificationBatchCreateResponse:
     try:
@@ -157,6 +170,19 @@ async def create_classification_batch(
             model_code=payload.model_code,
             mode=payload.mode,
             items=payload.items,
+        )
+        batch = result["batch"]
+        await audit_log_repository.record(
+            actor_user_id=current_user.id,
+            action="classification.batch_create",
+            entity_type="classification_batch",
+            entity_id=batch.id,
+            metadata={
+                "model_code": payload.model_code,
+                "mode": payload.mode,
+                "total_requests": batch.total_requests,
+                "estimated_cost": batch.estimated_cost,
+            },
         )
         await session.commit()
     except ModelNotFoundError as exc:
@@ -169,7 +195,6 @@ async def create_classification_batch(
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
 
-    batch = result["batch"]
     requests = result["requests"]
     return ClassificationBatchCreateResponse(
         batch_id=batch.id,

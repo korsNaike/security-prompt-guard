@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import CurrentUserDep, DbSessionDep
+from app.api.deps import AuditLogRepositoryDep, CurrentUserDep, DbSessionDep
 from app.domain.users.entities import UserRole
 from app.infrastructure.db.repositories.billing_repository import (
     BalanceNotFoundError,
@@ -113,6 +113,7 @@ async def adjust_user_balance(
     user_id: UUID,
     payload: AdminBalanceAdjustmentRequest,
     current_user: CurrentUserDep,
+    audit_log_repository: AuditLogRepositoryDep,
     session: DbSessionDep,
 ) -> AdminBalanceAdjustmentResponse:
     require_admin(current_user)
@@ -123,6 +124,17 @@ async def adjust_user_balance(
             amount_delta=payload.amount_delta,
             idempotency_key=f"admin:{current_user.id}:balance:{user_id}:{uuid4()}",
             description=payload.description,
+        )
+        await audit_log_repository.record(
+            actor_user_id=current_user.id,
+            action="admin.balance_adjust",
+            entity_type="user_balance",
+            entity_id=user_id,
+            metadata={
+                "amount_delta": payload.amount_delta,
+                "description": payload.description,
+                "transaction_id": str(transaction.id),
+            },
         )
         balance = await billing_repository.get_balance(user_id)
         await session.commit()
@@ -143,9 +155,21 @@ async def adjust_user_balance(
 
 
 @router.post("/loyalty-tiers/recalculate", summary="Admin recalculate loyalty tiers")
-async def recalculate_loyalty_tiers(current_user: CurrentUserDep) -> dict:
+async def recalculate_loyalty_tiers(
+    current_user: CurrentUserDep,
+    audit_log_repository: AuditLogRepositoryDep,
+    session: DbSessionDep,
+) -> dict:
     require_admin(current_user)
-    return await recalculate_loyalty_tiers_once()
+    result = await recalculate_loyalty_tiers_once()
+    await audit_log_repository.record(
+        actor_user_id=current_user.id,
+        action="admin.loyalty_recalculate",
+        entity_type="loyalty_tier",
+        metadata=result,
+    )
+    await session.commit()
+    return result
 
 
 @router.post("/promo-codes", summary="Admin create promo code")

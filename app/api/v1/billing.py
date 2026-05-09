@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import CurrentUserDep, DbSessionDep
+from app.api.deps import AuditLogRepositoryDep, CurrentUserDep, DbSessionDep
 from app.application.billing.use_cases import BillingService
 from app.infrastructure.db.repositories.billing_repository import (
     BillingRepository,
@@ -53,6 +53,7 @@ async def top_up(
     payload: TopUpRequest,
     current_user: CurrentUserDep,
     billing_service: BillingServiceDep,
+    audit_log_repository: AuditLogRepositoryDep,
     session: DbSessionDep,
 ) -> BillingTransactionResponse:
     try:
@@ -60,6 +61,13 @@ async def top_up(
             current_user.id,
             amount=payload.amount,
             idempotency_key=payload.idempotency_key,
+        )
+        await audit_log_repository.record(
+            actor_user_id=current_user.id,
+            action="billing.top_up",
+            entity_type="billing_transaction",
+            entity_id=transaction["id"],
+            metadata={"amount": transaction["amount"]},
         )
         await session.commit()
         return BillingTransactionResponse(**transaction)
@@ -73,10 +81,18 @@ async def activate_promo_code(
     payload: PromoCodeActivateRequest,
     current_user: CurrentUserDep,
     billing_service: BillingServiceDep,
+    audit_log_repository: AuditLogRepositoryDep,
     session: DbSessionDep,
 ) -> BillingTransactionResponse:
     try:
         transaction = await billing_service.activate_promo_code(current_user.id, payload.code)
+        await audit_log_repository.record(
+            actor_user_id=current_user.id,
+            action="billing.promo_activate",
+            entity_type="billing_transaction",
+            entity_id=transaction["id"],
+            metadata={"code": payload.code, "amount": transaction["amount"]},
+        )
         await session.commit()
         return BillingTransactionResponse(**transaction)
     except PromoCodeAlreadyActivatedError as exc:

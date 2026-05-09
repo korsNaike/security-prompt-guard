@@ -5,12 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.api.deps import get_current_user
+from app.api.deps import get_audit_log_repository, get_current_user
 from app.api.v1.classifications import get_classification_service
 from app.core.exceptions import ModelNotFoundError
 from app.infrastructure.db.models import UserBalanceModel, UserModel
 from app.main import app
 from app.schemas.classifications import ClassificationBatchCreateRequest
+from tests.unit.fakes import FakeAuditLogRepository
 
 
 class FakeClassificationService:
@@ -61,6 +62,7 @@ def client() -> TestClient:
     service = FakeClassificationService()
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_classification_service] = lambda: service
+    app.dependency_overrides[get_audit_log_repository] = lambda: FakeAuditLogRepository()
     try:
         yield TestClient(app)
     finally:

@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import AuthServiceDep, CurrentUserDep, DbSessionDep
+from app.api.deps import AuditLogRepositoryDep, AuthServiceDep, CurrentUserDep, DbSessionDep
 from app.application.auth.use_cases import (
     AuthenticationError,
     EmailAlreadyRegisteredError,
     InactiveUserError,
 )
+from app.core.security import create_access_token
 from app.infrastructure.db.models import UserModel
 from app.schemas.auth import (
     AuthResponse,
@@ -46,10 +47,18 @@ def to_auth_response(result) -> AuthResponse:
 async def register(
     payload: RegisterRequest,
     auth_service: AuthServiceDep,
+    audit_log_repository: AuditLogRepositoryDep,
     session: DbSessionDep,
 ) -> AuthResponse:
     try:
         result = await auth_service.register(email=str(payload.email), password=payload.password)
+        await audit_log_repository.record(
+            actor_user_id=result.user.id,
+            action="auth.register",
+            entity_type="user",
+            entity_id=result.user.id,
+            metadata={"email": result.user.email},
+        )
         await session.commit()
         return to_auth_response(result)
     except EmailAlreadyRegisteredError as exc:
@@ -64,11 +73,25 @@ async def register(
 
 
 @router.post("/login", summary="Login user")
-async def login(payload: LoginRequest, auth_service: AuthServiceDep) -> AuthResponse:
+async def login(
+    payload: LoginRequest,
+    auth_service: AuthServiceDep,
+    audit_log_repository: AuditLogRepositoryDep,
+    session: DbSessionDep,
+) -> AuthResponse:
     try:
         result = await auth_service.login(email=str(payload.email), password=payload.password)
+        await audit_log_repository.record(
+            actor_user_id=result.user.id,
+            action="auth.login",
+            entity_type="user",
+            entity_id=result.user.id,
+            metadata={"email": result.user.email},
+        )
+        await session.commit()
         return to_auth_response(result)
     except (AuthenticationError, InactiveUserError) as exc:
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -78,3 +101,24 @@ async def login(payload: LoginRequest, auth_service: AuthServiceDep) -> AuthResp
 @router.get("/me", summary="Get current user profile")
 async def me(current_user: CurrentUserDep) -> UserResponse:
     return to_user_response(current_user)
+
+
+@router.post("/refresh", summary="Refresh access token")
+async def refresh(
+    current_user: CurrentUserDep,
+    audit_log_repository: AuditLogRepositoryDep,
+    session: DbSessionDep,
+) -> AuthResponse:
+    await audit_log_repository.record(
+        actor_user_id=current_user.id,
+        action="auth.refresh",
+        entity_type="user",
+        entity_id=current_user.id,
+        metadata={"email": current_user.email},
+    )
+    await session.commit()
+    return AuthResponse(
+        access_token=create_access_token(str(current_user.id)),
+        token_type="bearer",
+        user=to_user_response(current_user),
+    )

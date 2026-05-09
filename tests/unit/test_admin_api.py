@@ -3,10 +3,11 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_current_user
+from app.api.deps import get_audit_log_repository, get_current_user
 from app.domain.users.entities import UserRole
 from app.infrastructure.db.models import UserBalanceModel, UserModel
 from app.main import app
+from tests.unit.fakes import FakeAuditLogRepository
 
 
 def build_user(role: str) -> UserModel:
@@ -17,6 +18,7 @@ def build_user(role: str) -> UserModel:
 
 @pytest.fixture
 def client():
+    app.dependency_overrides[get_audit_log_repository] = lambda: FakeAuditLogRepository()
     try:
         yield TestClient(app)
     finally:

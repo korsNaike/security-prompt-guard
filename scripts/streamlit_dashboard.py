@@ -45,3 +45,12 @@ if token:
     with cols[2]:
         st.subheader("Usage")
         st.json(fetch_json("/api/v1/analytics/usage", token))
+
+    st.subheader("Label distribution")
+    st.json(fetch_json("/api/v1/analytics/by-label", token))
+
+    st.subheader("Recent classifications")
+    st.json(fetch_json("/api/v1/classifications?limit=10", token))
+
+    st.subheader("Billing transactions")
+    st.json(fetch_json("/api/v1/billing/transactions", token))

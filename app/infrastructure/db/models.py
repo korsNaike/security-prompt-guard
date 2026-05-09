@@ -168,6 +168,30 @@ class BillingTransactionModel(Base):
             self.created_at = utc_now()
 
 
+class AuditLogModel(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    event_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.id is None:
+            self.id = uuid.uuid4()
+        if self.created_at is None:
+            self.created_at = utc_now()
+
+
 class ClassificationBatchModel(Base):
     __tablename__ = "classification_batches"
 

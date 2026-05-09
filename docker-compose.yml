@@ -88,6 +88,21 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
 
+  streamlit:
+    build: .
+    command: >-
+      uv run python -m streamlit run scripts/streamlit_dashboard.py
+      --server.address 0.0.0.0
+      --server.port 8501
+    env_file: .env.example
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   grafana_data:

@@ -42,3 +42,14 @@ def test_dockerignore_excludes_local_virtualenv() -> None:
 
     assert ".venv" in content
     assert ".git" in content
+
+
+def test_compose_declares_required_streamlit_service() -> None:
+    compose = yaml.safe_load(Path("docker-compose.yml").read_text())
+
+    streamlit = compose["services"]["streamlit"]
+
+    assert streamlit["build"] == "."
+    assert "python -m streamlit run scripts/streamlit_dashboard.py" in streamlit["command"]
+    assert streamlit["ports"] == ["${STREAMLIT_PORT:-8501}:8501"]
+    assert streamlit["depends_on"]["api"]["condition"] == "service_healthy"

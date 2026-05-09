@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     )
     redis_url: str = "redis://redis:6379/0"
     model_config_path: str = "config/models.yml"
-    jwt_secret_key: str = "change-me"
+    jwt_secret_key: str = "change-me-change-me-change-me-32"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
     initial_credits: int = 100
     cache_hit_cost: int = 1
 

@@ -14,6 +14,7 @@ def test_compose_uses_configurable_host_ports() -> None:
 def test_runtime_commands_use_python_modules() -> None:
     compose = yaml.safe_load(Path("docker-compose.yml").read_text())
 
+    assert "alembic upgrade head" in compose["services"]["api"]["command"]
     assert "python -m fastapi" in compose["services"]["api"]["command"]
     assert "python -m celery" in compose["services"]["worker"]["command"]
     assert "python -m celery" in compose["services"]["beat"]["command"]

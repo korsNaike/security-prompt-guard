@@ -184,6 +184,7 @@ async def create_promo_code(
             code=payload.code,
             credits_amount=payload.credits_amount,
             max_activations=payload.max_activations,
+            valid_until=payload.valid_until,
         )
         await session.commit()
         return AdminPromoCodeResponse(
@@ -191,6 +192,7 @@ async def create_promo_code(
             code=promo_code.code,
             credits_amount=promo_code.credits_amount,
             max_activations=promo_code.max_activations,
+            valid_until=promo_code.valid_until,
             used_count=promo_code.used_count,
             is_active=promo_code.is_active,
             created_at=promo_code.created_at,

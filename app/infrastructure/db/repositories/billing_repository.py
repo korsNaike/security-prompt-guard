@@ -380,18 +380,17 @@ class BillingRepository:
             and self._as_aware(promo_code.valid_until) < datetime.now(UTC)
         ):
             raise PromoCodeInvalidError("Promo code has expired")
-        if (
-            promo_code.max_activations is not None
-            and promo_code.used_count >= promo_code.max_activations
-        ):
-            raise PromoCodeInvalidError("Promo code activation limit reached")
-
         existing_activation = await self._get_promo_activation(
             promo_code_id=promo_code.id,
             user_id=user_id,
         )
         if existing_activation is not None:
             raise PromoCodeAlreadyActivatedError("Promo code already activated by user")
+        if (
+            promo_code.max_activations is not None
+            and promo_code.used_count >= promo_code.max_activations
+        ):
+            raise PromoCodeInvalidError("Promo code activation limit reached")
 
         promo_code.used_count += 1
         activation = PromoCodeActivationModel(
@@ -415,11 +414,13 @@ class BillingRepository:
         code: str,
         credits_amount: int,
         max_activations: int | None,
+        valid_until: datetime | None = None,
     ) -> PromoCodeModel:
         promo_code = PromoCodeModel(
             code=code.strip().upper(),
             credits_amount=credits_amount,
             max_activations=max_activations,
+            valid_until=valid_until,
         )
         self.session.add(promo_code)
         await self.session.flush()

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -7,6 +8,7 @@ from app.api.deps import get_audit_log_repository, get_current_user
 from app.domain.users.entities import UserRole
 from app.infrastructure.db.models import UserBalanceModel, UserModel
 from app.main import app
+from app.schemas.admin import AdminPromoCodeCreateRequest
 from tests.unit.fakes import FakeAuditLogRepository
 
 
@@ -51,3 +53,16 @@ def test_admin_router_exposes_required_contract_endpoints(client: TestClient) ->
         json={"amount_delta": 10, "description": "manual correction"},
     ).status_code == 403
     assert client.post("/api/v1/admin/loyalty-tiers/recalculate").status_code == 403
+
+
+def test_admin_promo_code_create_request_accepts_valid_until() -> None:
+    valid_until = datetime(2026, 6, 1, tzinfo=UTC)
+
+    payload = AdminPromoCodeCreateRequest(
+        code="SPRING",
+        credits_amount=50,
+        max_activations=2,
+        valid_until=valid_until,
+    )
+
+    assert payload.valid_until == valid_until

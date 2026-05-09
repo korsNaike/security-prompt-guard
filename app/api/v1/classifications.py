@@ -12,7 +12,6 @@ from app.application.classifications.use_cases import (
 )
 from app.core.exceptions import ModelNotFoundError, UnsupportedModeError
 from app.domain.classifications.entities import ClassificationStatus
-from app.domain.ml.classifier_contracts import ClassificationInput
 from app.infrastructure.db.repositories.billing_repository import (
     BillingRepository,
     InsufficientCreditsError,
@@ -29,7 +28,6 @@ from app.schemas.classifications import (
     ClassificationItemResponse,
     ClassificationListResponse,
     ClassificationResultResponse,
-    new_request_id,
 )
 
 router = APIRouter()
@@ -229,33 +227,6 @@ async def list_classifications(
         limit=limit,
     )
     return ClassificationListResponse(items=[to_item_response(item) for item in items])
-
-
-@router.post("/sync-preview", summary="Run local synchronous preview classifier")
-async def sync_preview(payload: ClassificationCreateRequest) -> ClassificationResultResponse:
-    try:
-        classifier = model_registry.get(payload.model_code)
-        cost = model_registry.get_cost(payload.model_code, payload.mode)
-    except (ModelNotFoundError, UnsupportedModeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    output = classifier.predict(
-        ClassificationInput(text=payload.text, model_code=payload.model_code, mode=payload.mode)
-    )
-    return ClassificationResultResponse(
-        request_id=new_request_id(),
-        status="completed",
-        model_code=payload.model_code,
-        mode=payload.mode,
-        product_name=classifier.product_name,
-        label=output.label,
-        risk_level=output.risk_level,
-        confidence=output.confidence,
-        recommended_action=output.recommended_action,
-        explanation=output.explanation,
-        cost=cost,
-    )
-
 
 @router.get("/{request_id}", summary="Get classification result")
 async def get_classification(

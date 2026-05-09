@@ -188,6 +188,23 @@ async def test_activate_promo_code_grants_credits_once(session_factory) -> None:
             await repository.activate_promo_code(user_id=user_id, code="WELCOME100")
 
 
+async def test_activate_promo_code_repeat_user_conflict_precedes_activation_limit(
+    session_factory,
+) -> None:
+    user_id = await create_user(session_factory)
+
+    async with session_factory() as session:
+        session.add(PromoCodeModel(code="ONCE", credits_amount=50, max_activations=1))
+        await session.commit()
+
+    async with session_factory() as session:
+        repository = BillingRepository(session)
+        await repository.activate_promo_code(user_id=user_id, code="ONCE")
+
+        with pytest.raises(PromoCodeAlreadyActivatedError):
+            await repository.activate_promo_code(user_id=user_id, code="ONCE")
+
+
 async def test_activate_promo_code_rejects_expired_code(session_factory) -> None:
     user_id = await create_user(session_factory)
 

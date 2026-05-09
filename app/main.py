@@ -46,7 +46,7 @@ def create_app() -> FastAPI:
     async def ready() -> dict[str, str]:
         try:
             async with AsyncSessionLocal() as session:
-                await session.execute(text("SELECT 1"))
+                await session.execute(text("SELECT 1 FROM users LIMIT 1"))
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -22,6 +22,7 @@ class AdminPromoCodeCreateRequest(BaseModel):
     code: str = Field(min_length=3, max_length=100)
     credits_amount: int = Field(gt=0)
     max_activations: int | None = Field(default=None, gt=0)
+    valid_until: datetime | None = None
 
 
 class AdminPromoCodeResponse(BaseModel):
@@ -29,6 +30,7 @@ class AdminPromoCodeResponse(BaseModel):
     code: str
     credits_amount: int
     max_activations: int | None
+    valid_until: datetime | None = None
     used_count: int
     is_active: bool
     created_at: datetime

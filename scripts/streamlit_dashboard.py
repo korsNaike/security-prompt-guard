@@ -33,7 +33,17 @@ st.json(health)
 st.subheader("Models")
 st.json(models)
 
-token = st.text_input("API token", type="password")
+with st.form("api-token-form"):
+    token_input = st.text_input(
+        "API token",
+        type="password",
+        value=st.session_state.get("api_token", ""),
+    )
+    token_submitted = st.form_submit_button("Apply token")
+if token_submitted:
+    st.session_state["api_token"] = token_input.strip()
+
+token = st.session_state.get("api_token", "")
 if token:
     cols = st.columns(3)
     with cols[0]:

@@ -9,6 +9,8 @@ from app.infrastructure.db.repositories.classification_repository import Classif
 from app.schemas.analytics import (
     AnalyticsCostItem,
     AnalyticsCostResponse,
+    AnalyticsLabelItem,
+    AnalyticsLabelsResponse,
     AnalyticsModelItem,
     AnalyticsModelsResponse,
     AnalyticsSummaryResponse,
@@ -64,4 +66,24 @@ async def analytics_models(
 ) -> AnalyticsModelsResponse:
     return AnalyticsModelsResponse(
         items=[AnalyticsModelItem(**item) for item in await service.models(current_user.id)]
+    )
+
+
+@router.get("/by-model", summary="Get model usage breakdown")
+async def analytics_by_model(
+    current_user: CurrentUserDep,
+    service: AnalyticsServiceDep,
+) -> AnalyticsModelsResponse:
+    return AnalyticsModelsResponse(
+        items=[AnalyticsModelItem(**item) for item in await service.models(current_user.id)]
+    )
+
+
+@router.get("/by-label", summary="Get label usage breakdown")
+async def analytics_by_label(
+    current_user: CurrentUserDep,
+    service: AnalyticsServiceDep,
+) -> AnalyticsLabelsResponse:
+    return AnalyticsLabelsResponse(
+        items=[AnalyticsLabelItem(**item) for item in await service.labels(current_user.id)]
     )

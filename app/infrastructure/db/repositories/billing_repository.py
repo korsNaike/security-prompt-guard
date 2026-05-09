@@ -44,14 +44,14 @@ DEFAULT_LOYALTY_TIERS = (
     {
         "code": "silver",
         "name": "Silver",
-        "min_monthly_predictions": 20,
-        "discount_percent": 10,
+        "min_monthly_predictions": 50,
+        "discount_percent": 5,
     },
     {
         "code": "gold",
         "name": "Gold",
-        "min_monthly_predictions": 100,
-        "discount_percent": 20,
+        "min_monthly_predictions": 200,
+        "discount_percent": 10,
     },
 )
 
@@ -110,8 +110,14 @@ class BillingRepository:
         result = await self.session.execute(select(LoyaltyTierModel))
         existing_by_code = {tier.code: tier for tier in result.scalars().all()}
         for tier_data in DEFAULT_LOYALTY_TIERS:
-            if tier_data["code"] not in existing_by_code:
+            existing = existing_by_code.get(tier_data["code"])
+            if existing is None:
                 self.session.add(LoyaltyTierModel(**tier_data))
+                continue
+            existing.name = tier_data["name"]
+            existing.min_monthly_predictions = tier_data["min_monthly_predictions"]
+            existing.discount_percent = tier_data["discount_percent"]
+            existing.is_active = True
         await self.session.flush()
 
         tiers_result = await self.session.execute(
@@ -199,6 +205,33 @@ class BillingRepository:
             user_id=user_id,
             amount=amount,
             transaction_type=BillingTransactionType.TOP_UP,
+            idempotency_key=idempotency_key,
+            description=description,
+        )
+
+    async def adjust_balance(
+        self,
+        *,
+        user_id: UUID,
+        amount_delta: int,
+        idempotency_key: str,
+        description: str,
+    ) -> BillingTransactionModel:
+        existing = await self._get_transaction_by_idempotency_key(idempotency_key)
+        if existing is not None:
+            return existing
+        if amount_delta == 0:
+            raise ValueError("amount_delta must be non-zero")
+
+        balance = await self._get_balance_for_update(user_id)
+        if balance.current_balance + amount_delta < 0:
+            raise InsufficientCreditsError("Balance adjustment would make balance negative")
+        balance.current_balance += amount_delta
+        balance.updated_at = datetime.now(UTC)
+        return await self._create_transaction(
+            user_id=user_id,
+            amount=amount_delta,
+            transaction_type=BillingTransactionType.ADMIN_ADJUSTMENT,
             idempotency_key=idempotency_key,
             description=description,
         )

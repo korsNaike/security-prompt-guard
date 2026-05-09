@@ -110,6 +110,15 @@ def test_batch_limit_is_100_items() -> None:
         )
 
 
+def test_batch_items_reject_empty_text() -> None:
+    with pytest.raises(ValidationError):
+        ClassificationBatchCreateRequest(
+            model_code="prompt_guard",
+            mode="standard",
+            items=[""],
+        )
+
+
 def test_create_batch_rejects_legacy_texts_field(client: TestClient) -> None:
     response = client.post(
         "/api/v1/classifications/batch",

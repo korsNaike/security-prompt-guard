@@ -8,3 +8,5 @@ def test_api_router_includes_analytics_routes() -> None:
     assert "/analytics/usage" in route_paths
     assert "/analytics/costs" in route_paths
     assert "/analytics/models" in route_paths
+    assert "/analytics/by-model" in route_paths
+    assert "/analytics/by-label" in route_paths

@@ -41,3 +41,14 @@ def test_admin_models_returns_catalog_for_admin(client: TestClient) -> None:
         "prompt_guard",
         "text_mood",
     }
+
+
+def test_admin_router_exposes_required_contract_endpoints(client: TestClient) -> None:
+    app.dependency_overrides[get_current_user] = lambda: build_user(UserRole.USER.value)
+
+    assert client.get("/api/v1/admin/classifications").status_code == 403
+    assert client.patch(
+        f"/api/v1/admin/users/{uuid4()}/balance",
+        json={"amount_delta": 10, "description": "manual correction"},
+    ).status_code == 403
+    assert client.post("/api/v1/admin/loyalty-tiers/recalculate").status_code == 403

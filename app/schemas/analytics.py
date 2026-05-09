@@ -37,3 +37,12 @@ class AnalyticsModelItem(BaseModel):
 
 class AnalyticsModelsResponse(BaseModel):
     items: list[AnalyticsModelItem]
+
+
+class AnalyticsLabelItem(BaseModel):
+    label: str
+    count: int
+
+
+class AnalyticsLabelsResponse(BaseModel):
+    items: list[AnalyticsLabelItem]

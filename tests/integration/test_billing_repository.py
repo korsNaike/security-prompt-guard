@@ -66,6 +66,25 @@ async def test_top_up_increases_balance_and_is_idempotent(session_factory) -> No
         assert balance.reserved_balance == 0
 
 
+async def test_admin_adjust_balance_writes_transaction(session_factory) -> None:
+    user_id = await create_user(session_factory)
+
+    async with session_factory() as session:
+        repository = BillingRepository(session)
+        transaction = await repository.adjust_balance(
+            user_id=user_id,
+            amount_delta=25,
+            idempotency_key="admin-adjust:1",
+            description="Manual correction",
+        )
+        balance = await repository.get_balance(user_id)
+
+        assert transaction.transaction_type == BillingTransactionType.ADMIN_ADJUSTMENT.value
+        assert transaction.amount == 25
+        assert balance.current_balance == 125
+        assert balance.reserved_balance == 0
+
+
 async def test_reserve_capture_and_refund_are_idempotent(session_factory) -> None:
     user_id = await create_user(session_factory)
 

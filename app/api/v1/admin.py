@@ -1,12 +1,25 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DbSessionDep
 from app.domain.users.entities import UserRole
-from app.infrastructure.db.repositories.billing_repository import BillingRepository
+from app.infrastructure.db.repositories.billing_repository import (
+    BalanceNotFoundError,
+    BillingRepository,
+    InsufficientCreditsError,
+)
+from app.infrastructure.db.repositories.classification_repository import ClassificationRepository
 from app.infrastructure.db.repositories.user_repository import UserRepository
 from app.infrastructure.ml.loader import model_registry
+from app.infrastructure.tasks.maintenance_tasks import recalculate_loyalty_tiers_once
 from app.schemas.admin import (
+    AdminBalanceAdjustmentRequest,
+    AdminBalanceAdjustmentResponse,
+    AdminClassificationListResponse,
+    AdminClassificationResponse,
     AdminPromoCodeCreateRequest,
     AdminPromoCodeResponse,
     AdminUserListResponse,
@@ -66,6 +79,73 @@ async def list_users(
             for user in users
         ]
     )
+
+
+@router.get("/classifications", summary="Admin classification list")
+async def list_classifications(
+    current_user: CurrentUserDep,
+    session: DbSessionDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> AdminClassificationListResponse:
+    require_admin(current_user)
+    requests = await ClassificationRepository(session).list_all(limit=limit)
+    return AdminClassificationListResponse(
+        items=[
+            AdminClassificationResponse(
+                id=request.id,
+                user_id=request.user_id,
+                model_code=request.model_code,
+                mode=request.mode,
+                status=request.status,
+                estimated_cost=request.estimated_cost,
+                final_cost=request.final_cost,
+                label=request.result.label if request.result is not None else None,
+                created_at=request.created_at,
+                completed_at=request.completed_at,
+            )
+            for request in requests
+        ]
+    )
+
+
+@router.patch("/users/{user_id}/balance", summary="Admin adjust user balance")
+async def adjust_user_balance(
+    user_id: UUID,
+    payload: AdminBalanceAdjustmentRequest,
+    current_user: CurrentUserDep,
+    session: DbSessionDep,
+) -> AdminBalanceAdjustmentResponse:
+    require_admin(current_user)
+    billing_repository = BillingRepository(session)
+    try:
+        transaction = await billing_repository.adjust_balance(
+            user_id=user_id,
+            amount_delta=payload.amount_delta,
+            idempotency_key=f"admin:{current_user.id}:balance:{user_id}:{uuid4()}",
+            description=payload.description,
+        )
+        balance = await billing_repository.get_balance(user_id)
+        await session.commit()
+        return AdminBalanceAdjustmentResponse(
+            user_id=user_id,
+            current_balance=balance.current_balance,
+            reserved_balance=balance.reserved_balance,
+            transaction_id=transaction.id,
+            amount=transaction.amount,
+            transaction_type=transaction.transaction_type,
+        )
+    except InsufficientCreditsError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except BalanceNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/loyalty-tiers/recalculate", summary="Admin recalculate loyalty tiers")
+async def recalculate_loyalty_tiers(current_user: CurrentUserDep) -> dict:
+    require_admin(current_user)
+    return await recalculate_loyalty_tiers_once()
 
 
 @router.post("/promo-codes", summary="Admin create promo code")

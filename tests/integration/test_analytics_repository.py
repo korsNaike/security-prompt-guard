@@ -99,6 +99,7 @@ async def test_analytics_aggregates_are_user_scoped(session_factory) -> None:
         summary = await classification_repository.get_user_analytics_summary(user.id)
         usage = await classification_repository.get_user_usage_breakdown(user.id)
         models = await classification_repository.get_user_model_breakdown(user.id)
+        labels = await classification_repository.get_user_label_breakdown(user.id)
         costs = await billing_repository.get_user_cost_breakdown(user.id)
 
     assert summary == {
@@ -111,4 +112,5 @@ async def test_analytics_aggregates_are_user_scoped(session_factory) -> None:
     }
     assert usage == [{"status": "completed", "count": 1}]
     assert models == [{"model_code": "prompt_guard", "count": 1, "final_cost": 1}]
+    assert labels == [{"label": "safe", "count": 1}]
     assert costs == [{"transaction_type": "cache_hit_charge", "amount": -1, "count": 1}]

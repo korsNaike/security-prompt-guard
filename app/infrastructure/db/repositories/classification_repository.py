@@ -130,6 +130,15 @@ class ClassificationRepository:
         )
         return list(result.scalars().all())
 
+    async def list_all(self, *, limit: int = 100) -> list[ClassificationRequestModel]:
+        result = await self.session.execute(
+            select(ClassificationRequestModel)
+            .options(selectinload(ClassificationRequestModel.result))
+            .order_by(ClassificationRequestModel.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_batch_for_user(
         self,
         *,
@@ -358,3 +367,16 @@ class ClassificationRepository:
             {"model_code": model_code, "count": int(count), "final_cost": int(final_cost or 0)}
             for model_code, count, final_cost in result.all()
         ]
+
+    async def get_user_label_breakdown(self, user_id: UUID) -> list[dict]:
+        result = await self.session.execute(
+            select(
+                ClassificationResultModel.label,
+                func.count(ClassificationResultModel.id),
+            )
+            .join(ClassificationRequestModel)
+            .where(ClassificationRequestModel.user_id == user_id)
+            .group_by(ClassificationResultModel.label)
+            .order_by(ClassificationResultModel.label)
+        )
+        return [{"label": label, "count": int(count)} for label, count in result.all()]

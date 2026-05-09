@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AdminUserResponse(BaseModel):
@@ -32,3 +32,41 @@ class AdminPromoCodeResponse(BaseModel):
     used_count: int
     is_active: bool
     created_at: datetime
+
+
+class AdminClassificationResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    model_code: str
+    mode: str
+    status: str
+    estimated_cost: int
+    final_cost: int | None
+    label: str | None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+class AdminClassificationListResponse(BaseModel):
+    items: list[AdminClassificationResponse]
+
+
+class AdminBalanceAdjustmentRequest(BaseModel):
+    amount_delta: int
+    description: str = Field(min_length=1, max_length=500)
+
+    @field_validator("amount_delta")
+    @classmethod
+    def validate_amount_delta(cls, value: int) -> int:
+        if value == 0:
+            raise ValueError("amount_delta must be non-zero")
+        return value
+
+
+class AdminBalanceAdjustmentResponse(BaseModel):
+    user_id: UUID
+    current_balance: int
+    reserved_balance: int
+    transaction_id: UUID
+    amount: int
+    transaction_type: str

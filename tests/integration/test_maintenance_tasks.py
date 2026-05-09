@@ -86,7 +86,7 @@ async def test_recalculate_loyalty_tiers_bootstraps_and_updates_user(session_fac
             hashed_password="hashed",
             initial_credits=100,
         )
-        for index in range(25):
+        for index in range(75):
             session.add(
                 ClassificationRequestModel(
                     user_id=user.id,
@@ -115,4 +115,6 @@ async def test_recalculate_loyalty_tiers_bootstraps_and_updates_user(session_fac
         history_count = len(history_result.scalars().all())
 
         assert tier.code == "silver"
+        assert tier.min_monthly_predictions == 50
+        assert tier.discount_percent == 5
         assert history_count == 1

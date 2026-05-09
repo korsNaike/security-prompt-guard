@@ -1,0 +1,1 @@
+"""UniClassify Platform application package."""

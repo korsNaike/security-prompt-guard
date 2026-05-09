@@ -1,0 +1,65 @@
+services:
+  api:
+    build: .
+    command: uv run fastapi dev app/main.py --host 0.0.0.0 --port 8000
+    env_file: .env.example
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build: .
+    command: uv run celery -A app.infrastructure.tasks.celery_app.celery_app worker --loglevel=INFO
+    env_file: .env.example
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+
+  beat:
+    build: .
+    command: uv run celery -A app.infrastructure.tasks.celery_app.celery_app beat --loglevel=INFO
+    env_file: .env.example
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: uniclassify
+      POSTGRES_USER: uniclassify
+      POSTGRES_PASSWORD: uniclassify
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  postgres_data:
+  grafana_data:

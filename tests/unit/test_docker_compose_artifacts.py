@@ -34,3 +34,10 @@ def test_override_preserves_container_virtualenv() -> None:
 
     assert "api_venv:/app/.venv" in override["services"]["api"]["volumes"]
     assert "worker_venv:/app/.venv" in override["services"]["worker"]["volumes"]
+
+
+def test_dockerignore_excludes_local_virtualenv() -> None:
+    content = Path(".dockerignore").read_text().splitlines()
+
+    assert ".venv" in content
+    assert ".git" in content

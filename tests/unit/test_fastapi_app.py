@@ -1,0 +1,14 @@
+from app.main import app
+
+
+def test_app_metadata() -> None:
+    assert app.title == "UniClassify Platform"
+    assert app.version == "0.1.0"
+
+
+def test_health_route_registered() -> None:
+    route_paths = {route.path for route in app.routes}
+
+    assert "/health" in route_paths
+    assert "/docs" in route_paths
+    assert "/openapi.json" in route_paths

@@ -17,7 +17,7 @@ def hit(url: str) -> float:
 
 
 def main() -> int:
-    base_url = os.getenv("UNICLASSIFY_BASE_URL", "http://127.0.0.1:8000")
+    base_url = os.getenv("SECURE_PROMPT_GUARD_BASE_URL", "http://127.0.0.1:8000")
     requests = int(os.getenv("LOAD_TEST_REQUESTS", "50"))
     concurrency = int(os.getenv("LOAD_TEST_CONCURRENCY", "5"))
     url = f"{base_url}/health"

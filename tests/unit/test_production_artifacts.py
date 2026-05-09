@@ -40,7 +40,7 @@ def test_smoke_and_load_scripts_are_environment_configurable() -> None:
     load = Path("scripts/load_test.py").read_text()
     acceptance = Path("scripts/acceptance_scenario.py").read_text()
 
-    assert "UNICLASSIFY_BASE_URL" in smoke
+    assert "SECURE_PROMPT_GUARD_BASE_URL" in smoke
     assert "LOAD_TEST_REQUESTS" in load
     assert "LOAD_TEST_CONCURRENCY" in load
-    assert "UNICLASSIFY_BASE_URL" in acceptance
+    assert "SECURE_PROMPT_GUARD_BASE_URL" in acceptance

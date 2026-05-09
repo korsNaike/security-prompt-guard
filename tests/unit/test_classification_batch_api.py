@@ -15,15 +15,15 @@ class FakeClassificationService:
         self.batch_id = uuid4()
         self.request_ids = [uuid4(), uuid4()]
 
-    async def create_batch(self, *, user_id, model_code: str, mode: str, texts: list[str]):
+    async def create_batch(self, *, user_id, model_code: str, mode: str, items: list[str]):
         batch = type(
             "Batch",
             (),
             {
                 "id": self.batch_id,
                 "status": "pending",
-                "total_requests": len(texts),
-                "estimated_cost": len(texts) * 7,
+                "total_requests": len(items),
+                "estimated_cost": len(items) * 7,
             },
         )()
         requests = [type("Request", (), {"id": request_id})() for request_id in self.request_ids]
@@ -62,7 +62,22 @@ def client() -> TestClient:
         app.dependency_overrides.clear()
 
 
-def test_create_batch_returns_batch_and_child_request_ids(client: TestClient) -> None:
+def test_create_batch_accepts_items_contract(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/classifications/batch",
+        json={
+            "model_code": "prompt_guard",
+            "mode": "standard",
+            "items": ["one", "two"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_requests"] == 2
+    assert len(response.json()["request_ids"]) == 2
+
+
+def test_create_batch_rejects_legacy_texts_field(client: TestClient) -> None:
     response = client.post(
         "/api/v1/classifications/batch",
         json={
@@ -72,9 +87,7 @@ def test_create_batch_returns_batch_and_child_request_ids(client: TestClient) ->
         },
     )
 
-    assert response.status_code == 200
-    assert response.json()["total_requests"] == 2
-    assert len(response.json()["request_ids"]) == 2
+    assert response.status_code == 422
 
 
 def test_get_batch_returns_aggregate_progress(client: TestClient) -> None:

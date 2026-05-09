@@ -69,7 +69,7 @@ async def test_create_batch_creates_children_reserves_and_enqueues() -> None:
         user_id=uuid4(),
         model_code="prompt_guard",
         mode="standard",
-        texts=["one", "two"],
+        items=["one", "two"],
     )
 
     assert result["batch"].estimated_cost == 14
@@ -90,7 +90,7 @@ async def test_create_batch_rejects_empty_payload() -> None:
             user_id=uuid4(),
             model_code="prompt_guard",
             mode="standard",
-            texts=[],
+            items=[],
         )
     except ClassificationBatchSizeError:
         return

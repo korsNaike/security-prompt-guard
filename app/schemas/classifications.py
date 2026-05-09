@@ -13,7 +13,7 @@ class ClassificationCreateRequest(BaseModel):
 class ClassificationBatchCreateRequest(BaseModel):
     model_code: str = Field(min_length=1, examples=["prompt_guard"])
     mode: str = Field(min_length=1, examples=["standard"])
-    texts: list[str] = Field(min_length=1, max_length=50)
+    items: list[str] = Field(min_length=1, max_length=50, examples=[["one", "two"]])
 
 
 class ClassificationCreateResponse(BaseModel):

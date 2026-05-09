@@ -153,7 +153,7 @@ async def create_classification_batch(
             user_id=current_user.id,
             model_code=payload.model_code,
             mode=payload.mode,
-            texts=payload.texts,
+            items=payload.items,
         )
         await session.commit()
     except (ModelNotFoundError, UnsupportedModeError, ClassificationBatchSizeError) as exc:

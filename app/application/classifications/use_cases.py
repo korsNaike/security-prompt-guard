@@ -72,19 +72,19 @@ class ClassificationService:
         user_id: UUID,
         model_code: str,
         mode: str,
-        texts: list[str],
+        items: list[str],
     ) -> dict:
-        if not texts or len(texts) > 50:
+        if not items or len(items) > 50:
             raise ClassificationBatchSizeError("Batch size must be between 1 and 50")
 
         estimated_cost_per_item = self.model_registry.get_cost(model_code, mode)
         batch = await self.repository.create_batch(
             user_id=user_id,
-            total_requests=len(texts),
-            estimated_cost=estimated_cost_per_item * len(texts),
+            total_requests=len(items),
+            estimated_cost=estimated_cost_per_item * len(items),
         )
         requests = []
-        for text in texts:
+        for text in items:
             request = await self.repository.create_request(
                 user_id=user_id,
                 batch_id=batch.id,

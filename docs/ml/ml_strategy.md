@@ -57,6 +57,7 @@ TextMood Analytics:
 - Keep model instances process-local.
 - Expose warmup hooks for production workers.
 - Rule-based MVP classifiers load immediately.
+- Real Hugging Face adapters are opt-in plugin factories and are not registered by default, so app startup never depends on model downloads.
 
 ## Caching Strategy
 
@@ -77,3 +78,4 @@ TextMood Analytics:
 - Track false positives separately from false negatives for prompt safety.
 - For TextMood, evaluate business action quality, not only sentiment accuracy.
 - Do not compare models solely on public benchmark scores; validate on support/prompt examples close to the product domain.
+- Use `scripts/evaluate_classifier.py` for deterministic JSONL smoke evaluation before introducing training or external benchmarks.

@@ -10,3 +10,4 @@ __pycache__/
 .mcp.json
 review-artifacts
 output
+docs

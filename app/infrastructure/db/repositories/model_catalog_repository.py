@@ -18,6 +18,14 @@ class ModelCatalogRepository:
         )
         return list(result.scalars().all())
 
+    async def get_model_by_code(self, model_code: str) -> MLModelModel | None:
+        result = await self.session.execute(
+            select(MLModelModel)
+            .options(selectinload(MLModelModel.pricing))
+            .where(MLModelModel.model_code == model_code)
+        )
+        return result.scalar_one_or_none()
+
     async def upsert_model(
         self,
         *,
@@ -70,11 +78,23 @@ class ModelCatalogRepository:
         await self.session.flush()
         return model
 
+    async def deactivate_models_except(self, active_model_codes: set[str]) -> None:
+        result = await self.session.execute(
+            select(MLModelModel).options(selectinload(MLModelModel.pricing))
+        )
+        for model in result.scalars().all():
+            if model.model_code not in active_model_codes:
+                model.is_active = False
+                for price in model.pricing:
+                    price.is_active = False
+        await self.session.flush()
+
 
 async def sync_model_catalog_from_definitions(
     repository: ModelCatalogRepository,
     definitions,
 ) -> None:
+    active_model_codes = {definition.model_code for definition in definitions}
     for definition in definitions:
         await repository.upsert_model(
             model_code=definition.model_code,
@@ -85,3 +105,4 @@ async def sync_model_catalog_from_definitions(
             labels=definition.labels,
             pricing=definition.pricing,
         )
+    await repository.deactivate_models_except(active_model_codes)

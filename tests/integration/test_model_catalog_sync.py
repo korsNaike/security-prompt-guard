@@ -33,4 +33,32 @@ async def test_sync_model_catalog_from_default_config(session_factory) -> None:
     async with session_factory() as session:
         items = await ModelCatalogRepository(session).list_models()
 
-        assert {item.model_code for item in items} == {"prompt_guard", "text_mood"}
+        assert {item.model_code for item in items} == {"prompt_guard"}
+
+
+async def test_sync_model_catalog_deactivates_models_missing_from_config(session_factory) -> None:
+    definitions = load_model_definitions("config/models.yml")
+
+    async with session_factory() as session:
+        repository = ModelCatalogRepository(session)
+        await repository.upsert_model(
+            model_code="retired_model",
+            product_name="Retired Model",
+            model_name="RetiredClassifier",
+            model_version="0.1.0",
+            task_type="retired_classification",
+            labels=["retired"],
+            pricing={"basic": 2},
+        )
+        await sync_model_catalog_from_definitions(repository, definitions)
+        await session.commit()
+
+    async with session_factory() as session:
+        repository = ModelCatalogRepository(session)
+        items = await repository.list_models()
+        stale = await repository.get_model_by_code("retired_model")
+
+        assert {item.model_code for item in items} == {"prompt_guard"}
+        assert stale is not None
+        assert stale.is_active is False
+        assert all(price.is_active is False for price in stale.pricing)

@@ -125,6 +125,36 @@ Acceptance scenario:
 uv run python scripts/acceptance_scenario.py
 ```
 
+## Demo Screenshots
+
+The screenshots below were captured from a clean Docker Compose run after
+executing the full demo flow: user registration, balance top-up, single
+classifications, cache-hit classification, batch classification, analytics,
+database verification, Prometheus scraping, Grafana dashboard rendering, and
+Streamlit dashboard authentication.
+
+### API and Runtime Evidence
+
+![Swagger API](review-artifacts/readme-demo/01-swagger-api-docs.png)
+
+![Model catalog JSON](review-artifacts/readme-demo/02-model-catalog-json.png)
+
+![API responses and database evidence](review-artifacts/readme-demo/03-api-db-evidence.png)
+
+### Streamlit Dashboard
+
+![Streamlit authenticated dashboard](review-artifacts/readme-demo/04-streamlit-authenticated-demo.png)
+
+### Prometheus and Grafana
+
+![Prometheus targets](review-artifacts/readme-demo/05-prometheus-targets.png)
+
+![Prometheus worker metrics query](review-artifacts/readme-demo/06-prometheus-worker-query.png)
+
+![API metrics endpoint](review-artifacts/readme-demo/07-api-metrics-endpoint.png)
+
+![Grafana dashboard](review-artifacts/readme-demo/08-grafana-dashboard.png)
+
 ## API
 
 - `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,

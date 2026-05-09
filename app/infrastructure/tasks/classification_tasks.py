@@ -43,9 +43,11 @@ async def process_classification_request(
             if request is None:
                 return {"request_id": request_id, "status": "not_found"}
 
+            classifier = registry.get(request.model_code)
             cached_result = cache.get(
                 model_code=request.model_code,
                 mode=request.mode,
+                model_version=classifier.model_version,
                 text=request.input_text,
             )
             cache_hit = cached_result is not None
@@ -55,7 +57,6 @@ async def process_classification_request(
                 model_version = cached_result.model_version
                 final_cost = min(settings.cache_hit_cost, request.estimated_cost)
             else:
-                classifier = registry.get(request.model_code)
                 output = classifier.predict(
                     ClassificationInput(
                         text=request.input_text,
@@ -85,14 +86,24 @@ async def process_classification_request(
                 model_version=model_version,
                 final_cost=final_cost,
             )
-            await billing_repository.capture_reserved_credits(
-                user_id=request.user_id,
-                amount=final_cost,
-                idempotency_key=f"classification:{request.id}:capture",
-                related_transaction_id=hold.id,
-                description=f"Capture classification {request.id}",
-                classification_request_id=request.id,
-            )
+            if cache_hit:
+                await billing_repository.charge_cache_hit(
+                    user_id=request.user_id,
+                    amount=final_cost,
+                    idempotency_key=f"classification:{request.id}:cache-hit-charge",
+                    related_transaction_id=hold.id,
+                    description=f"Charge cache hit for classification {request.id}",
+                    classification_request_id=request.id,
+                )
+            else:
+                await billing_repository.capture_reserved_credits(
+                    user_id=request.user_id,
+                    amount=final_cost,
+                    idempotency_key=f"classification:{request.id}:capture",
+                    related_transaction_id=hold.id,
+                    description=f"Capture classification {request.id}",
+                    classification_request_id=request.id,
+                )
             refund_amount = request.estimated_cost - final_cost
             if refund_amount > 0:
                 await billing_repository.refund_reserved_credits(
@@ -111,6 +122,7 @@ async def process_classification_request(
                 cache.set(
                     model_code=request.model_code,
                     mode=request.mode,
+                    model_version=model_version,
                     text=request.input_text,
                     result=CachedClassificationResult.from_output(
                         output=output,

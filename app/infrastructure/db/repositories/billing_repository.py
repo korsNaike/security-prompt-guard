@@ -246,6 +246,38 @@ class BillingRepository:
             classification_request_id=classification_request_id,
         )
 
+    async def charge_cache_hit(
+        self,
+        *,
+        user_id: UUID,
+        amount: int,
+        idempotency_key: str,
+        related_transaction_id: UUID,
+        description: str,
+        classification_request_id: UUID | None = None,
+    ) -> BillingTransactionModel:
+        existing = await self._get_transaction_by_idempotency_key(idempotency_key)
+        if existing is not None:
+            return existing
+        if amount <= 0:
+            raise ValueError("amount must be positive")
+
+        balance = await self._get_balance_for_update(user_id)
+        if balance.reserved_balance < amount:
+            raise InsufficientCreditsError("Insufficient reserved credits")
+        balance.reserved_balance -= amount
+        balance.updated_at = datetime.now(UTC)
+
+        return await self._create_transaction(
+            user_id=user_id,
+            amount=-amount,
+            transaction_type=BillingTransactionType.CACHE_HIT_CHARGE,
+            idempotency_key=idempotency_key,
+            description=description,
+            related_transaction_id=related_transaction_id,
+            classification_request_id=classification_request_id,
+        )
+
     async def refund_reserved_credits(
         self,
         *,

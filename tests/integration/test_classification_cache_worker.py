@@ -90,6 +90,11 @@ async def test_worker_cache_hit_captures_discount_and_refunds_delta(session_fact
         assert balance.reserved_balance == 0
         assert second_request.final_cost == 1
         assert second_request.result.result_metadata["cache_hit"] is True
+        cache_charge = await billing_repository.get_transaction_by_idempotency_key(
+            f"classification:{second_request_id}:cache-hit-charge"
+        )
+        assert cache_charge is not None
+        assert cache_charge.transaction_type == "cache_hit_charge"
         assert (
             await billing_repository.get_transaction_by_idempotency_key(
                 f"classification:{second_request_id}:cache-refund"

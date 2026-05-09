@@ -8,10 +8,80 @@ from app.infrastructure.cache.classification_cache import (
 def test_cache_key_normalizes_whitespace_and_case() -> None:
     cache = InMemoryClassificationCache()
 
-    first = cache.build_key(model_code="prompt_guard", mode="standard", text=" Hello   WORLD ")
-    second = cache.build_key(model_code="prompt_guard", mode="standard", text="hello world")
+    first = cache.build_key(
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="v1",
+        text=" Hello   WORLD ",
+    )
+    second = cache.build_key(
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="v1",
+        text="hello world",
+    )
 
     assert first == second
+
+
+def test_cache_key_includes_model_version() -> None:
+    cache = InMemoryClassificationCache()
+    result_v1 = CachedClassificationResult(
+        label="safe",
+        confidence=0.9,
+        risk_level="low",
+        recommended_action="allow",
+        explanation="v1",
+        raw_scores={},
+        metadata={},
+        model_code="prompt_guard",
+        model_version="1.0.0",
+    )
+    result_v2 = CachedClassificationResult(
+        label="unsafe",
+        confidence=0.9,
+        risk_level="high",
+        recommended_action="block",
+        explanation="v2",
+        raw_scores={},
+        metadata={},
+        model_code="prompt_guard",
+        model_version="2.0.0",
+    )
+
+    cache.set(
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="1.0.0",
+        text="hello",
+        result=result_v1,
+    )
+    cache.set(
+        model_code="prompt_guard",
+        mode="standard",
+        model_version="2.0.0",
+        text="hello",
+        result=result_v2,
+    )
+
+    assert (
+        cache.get(
+            model_code="prompt_guard",
+            mode="standard",
+            model_version="1.0.0",
+            text="hello",
+        ).label
+        == "safe"
+    )
+    assert (
+        cache.get(
+            model_code="prompt_guard",
+            mode="standard",
+            model_version="2.0.0",
+            text="hello",
+        ).label
+        == "unsafe"
+    )
 
 
 def test_cached_result_round_trips_to_classification_output() -> None:

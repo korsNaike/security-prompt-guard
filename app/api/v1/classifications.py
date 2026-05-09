@@ -145,6 +145,9 @@ async def create_classification(
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
 
+    await classification_service.enqueue_classification(request)
+    await session.commit()
+
     return ClassificationCreateResponse(
         request_id=request.id,
         status=ClassificationStatus.PENDING.value,
@@ -194,6 +197,9 @@ async def create_classification_batch(
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
 
     requests = result["requests"]
+    await classification_service.enqueue_batch(requests)
+    await session.commit()
+
     return ClassificationBatchCreateResponse(
         batch_id=batch.id,
         status=batch.status,

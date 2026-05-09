@@ -15,6 +15,7 @@ class FakeRepository:
     def __init__(self) -> None:
         self.batch_id = uuid4()
         self.requests = []
+        self.task_ids = []
 
     async def create_batch(self, **kwargs):
         return type(
@@ -46,7 +47,7 @@ class FakeRepository:
         return type("BatchItem", (), kwargs)()
 
     async def set_celery_task_id(self, *, request_id, celery_task_id: str) -> None:
-        return None
+        self.task_ids.append((request_id, celery_task_id))
 
 
 class FakeBillingRepository:
@@ -61,7 +62,7 @@ class FakeBillingRepository:
         self.reservations.append(kwargs)
 
 
-async def test_create_batch_creates_children_reserves_and_enqueues() -> None:
+async def test_create_batch_creates_children_reserves_without_enqueuing() -> None:
     repository = FakeRepository()
     billing_repository = FakeBillingRepository()
     sent = []
@@ -82,7 +83,16 @@ async def test_create_batch_creates_children_reserves_and_enqueues() -> None:
     assert result["batch"].estimated_cost == 14
     assert len(result["requests"]) == 2
     assert len(billing_repository.reservations) == 2
+    assert sent == []
+    assert repository.task_ids == []
+
+    await service.enqueue_batch(result["requests"])
+
     assert [request.id for request in result["requests"]] == sent
+    assert repository.task_ids == [
+        (result["requests"][0].id, "task-1"),
+        (result["requests"][1].id, "task-2"),
+    ]
 
 
 async def test_create_batch_rejects_empty_payload() -> None:

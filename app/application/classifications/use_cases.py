@@ -63,14 +63,6 @@ class ClassificationService:
             classification_request_id=request.id,
         )
 
-        if self.task_sender is not None:
-            task = self.task_sender(request.id)
-            task_id = getattr(task, "id", None) or (task if isinstance(task, str) else None)
-            if task_id is not None:
-                await self.repository.set_celery_task_id(
-                    request_id=request.id,
-                    celery_task_id=str(task_id),
-                )
         return request
 
     async def create_batch(
@@ -119,17 +111,23 @@ class ClassificationService:
             )
             requests.append(request)
 
-        for request in requests:
-            if self.task_sender is not None:
-                task = self.task_sender(request.id)
-                task_id = getattr(task, "id", None) or (task if isinstance(task, str) else None)
-                if task_id is not None:
-                    await self.repository.set_celery_task_id(
-                        request_id=request.id,
-                        celery_task_id=str(task_id),
-                    )
-
         return {"batch": batch, "requests": requests}
+
+    async def enqueue_classification(self, request) -> None:
+        if self.task_sender is None:
+            return
+
+        task = self.task_sender(request.id)
+        task_id = getattr(task, "id", None) or (task if isinstance(task, str) else None)
+        if task_id is not None:
+            await self.repository.set_celery_task_id(
+                request_id=request.id,
+                celery_task_id=str(task_id),
+            )
+
+    async def enqueue_batch(self, requests) -> None:
+        for request in requests:
+            await self.enqueue_classification(request)
 
     async def get_classification(self, *, user_id: UUID, request_id: UUID):
         request = await self.repository.get_by_id_for_user(request_id=request_id, user_id=user_id)

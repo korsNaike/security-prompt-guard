@@ -47,7 +47,7 @@ class FakeBillingRepository:
         return type("Transaction", (), {"id": uuid4()})()
 
 
-async def test_create_classification_reserves_credits_and_enqueues_task() -> None:
+async def test_create_classification_reserves_credits_without_enqueuing_task() -> None:
     user_id = uuid4()
     repository = FakeClassificationRepository()
     billing_repository = FakeBillingRepository()
@@ -75,6 +75,11 @@ async def test_create_classification_reserves_credits_and_enqueues_task() -> Non
         billing_repository.reservations[0]["idempotency_key"]
         == f"classification:{request.id}:hold"
     )
+    assert sent_requests == []
+    assert repository.task_ids == []
+
+    await service.enqueue_classification(request)
+
     assert sent_requests == [request.id]
     assert repository.task_ids == [(request.id, "task-1")]
 

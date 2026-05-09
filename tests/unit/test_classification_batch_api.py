@@ -9,15 +9,17 @@ from app.api.deps import get_audit_log_repository, get_current_user
 from app.api.v1.classifications import get_classification_service
 from app.core.exceptions import ModelNotFoundError
 from app.infrastructure.db.models import UserBalanceModel, UserModel
+from app.infrastructure.db.session import get_db_session
 from app.main import app
 from app.schemas.classifications import ClassificationBatchCreateRequest
 from tests.unit.fakes import FakeAuditLogRepository
 
 
 class FakeClassificationService:
-    def __init__(self) -> None:
+    def __init__(self, events: list[str] | None = None) -> None:
         self.batch_id = uuid4()
         self.request_ids = [uuid4(), uuid4()]
+        self.events = events if events is not None else []
 
     async def create_batch(self, *, user_id, model_code: str, mode: str, items: list[str]):
         if model_code == "missing_model":
@@ -34,6 +36,9 @@ class FakeClassificationService:
         )()
         requests = [type("Request", (), {"id": request_id})() for request_id in self.request_ids]
         return {"batch": batch, "requests": requests}
+
+    async def enqueue_batch(self, requests):
+        self.events.append("enqueue")
 
     async def get_batch(self, *, user_id, batch_id):
         requests = [type("Request", (), {"id": request_id})() for request_id in self.request_ids]
@@ -53,6 +58,17 @@ class FakeClassificationService:
                 "completed_at": datetime.now(UTC),
             },
         )()
+
+
+class FakeDbSession:
+    def __init__(self, events: list[str] | None = None) -> None:
+        self.events = events if events is not None else []
+
+    async def commit(self) -> None:
+        self.events.append("commit")
+
+    async def rollback(self) -> None:
+        self.events.append("rollback")
 
 
 @pytest.fixture
@@ -82,6 +98,32 @@ def test_create_batch_accepts_items_contract(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["total_requests"] == 2
     assert len(response.json()["request_ids"]) == 2
+
+
+def test_create_batch_enqueues_after_commit() -> None:
+    events = []
+    user = UserModel(id=uuid4(), email="user@example.com", hashed_password="hashed")
+    user.balance = UserBalanceModel(user_id=user.id, current_balance=100, reserved_balance=0)
+    service = FakeClassificationService(events=events)
+    session = FakeDbSession(events=events)
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_classification_service] = lambda: service
+    app.dependency_overrides[get_audit_log_repository] = lambda: FakeAuditLogRepository()
+    app.dependency_overrides[get_db_session] = lambda: session
+    try:
+        response = TestClient(app).post(
+            "/api/v1/classifications/batch",
+            json={
+                "model_code": "prompt_guard",
+                "mode": "standard",
+                "items": ["one", "two"],
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert events == ["commit", "enqueue", "commit"]
 
 
 def test_create_batch_unknown_model_returns_404(client: TestClient) -> None:
